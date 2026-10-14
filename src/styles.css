@@ -687,6 +687,33 @@ a.course-setup-badge:focus-visible {
     font-size: .88rem;
   }
 
+  .course-details .scorecard-scroll {
+    margin-right: -12px;
+    margin-left: -12px;
+    padding: 0 12px 6px;
+  }
+
+  .course-details .stats-table {
+    width: max-content;
+    min-width: 100%;
+    font-size: .76rem;
+  }
+
+  .course-details .stats-table th,
+  .course-details .stats-table td {
+    min-width: 58px;
+    padding: 6px 5px;
+  }
+
+  .course-details .stats-table th:first-child {
+    min-width: 48px;
+  }
+
+  .course-details .stats-table thead th {
+    white-space: normal;
+    line-height: 1.25;
+  }
+
   .round-heading {
     align-items: flex-start;
   }
