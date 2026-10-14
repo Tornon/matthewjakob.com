@@ -15,5 +15,11 @@ export const routes: Routes = [
       import('./golf-courses/golf-courses.component').then((module) => module.GolfCoursesComponent),
     title: 'Course Details & Stats'
   },
+  {
+    path: 'golf-course-notes',
+    loadComponent: () =>
+      import('./golf-courses/golf-course-notes.component').then((module) => module.GolfCourseNotesComponent),
+    title: 'Course Notes'
+  },
   { path: '**', redirectTo: '' }
 ];

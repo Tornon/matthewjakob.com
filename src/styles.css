@@ -294,6 +294,59 @@ a.course-setup-badge:focus-visible {
   font-size: .95rem;
 }
 
+.scorecard-entry-list {
+  display: grid;
+  gap: 14px;
+}
+
+.scorecard-entry,
+.par-entry {
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid #475569;
+  border-radius: 8px;
+}
+
+.scorecard-entry legend,
+.par-entry legend {
+  padding: 0 6px;
+  color: #bae6fd;
+  font-weight: 700;
+}
+
+.scorecard-entry-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.scorecard-entry-heading label {
+  flex: 1;
+}
+
+.hole-entry-grid {
+  display: grid;
+  grid-template-columns: repeat(9, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.hole-entry-grid label {
+  gap: 4px;
+  text-align: center;
+  font-size: .78rem;
+}
+
+.hole-entry-grid input {
+  padding: 8px 4px;
+  text-align: center;
+}
+
+.par-entry-grid {
+  max-width: 720px;
+}
+
 .form-row {
   display: flex;
   gap: 10px;
@@ -328,6 +381,8 @@ a.course-setup-badge:focus-visible {
 
 .admin-form button,
 .admin-panel > button,
+.course-note-form > button,
+.hole-photo-upload > button,
 .secondary-button {
   width: fit-content;
   padding: 11px 16px;
@@ -671,6 +726,235 @@ a.course-setup-badge:focus-visible {
   font-size: 1.25rem;
 }
 
+.course-notes-link {
+  display: inline-block;
+  text-decoration: none;
+}
+
+.round-course-notes-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+  padding: 8px 12px;
+  border: 1px solid #0284c7;
+  border-radius: 7px;
+  background: #0c4a6e;
+  color: #e0f2fe;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background-color .15s, border-color .15s;
+}
+
+.round-course-notes-link:hover,
+.round-course-notes-link:focus-visible {
+  border-color: #38bdf8;
+  background: #075985;
+}
+
+.round-course-rating {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding-left: 10px;
+  border-left: 1px solid #38bdf8;
+  color: #fbbf24;
+  white-space: nowrap;
+}
+
+.round-course-rating > span:not([aria-hidden="true"]) {
+  color: #cbd5e1;
+  font-size: .8rem;
+  font-weight: 400;
+}
+
+.course-notes-page > h1 {
+  margin: 18px 0 8px;
+}
+
+.course-notes-back-log {
+  display: inline-block;
+  margin: 0 0 16px 12px;
+  text-decoration: none;
+}
+
+.course-notes-section {
+  display: grid;
+  gap: 14px;
+  margin-top: 24px;
+  padding: 20px;
+  border: 1px solid #334155;
+  border-radius: 12px;
+  background: #1e293b;
+}
+
+.course-notes-section h2 {
+  font-size: 1.35rem;
+}
+
+.course-rating-summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #94a3b8;
+}
+
+.course-rating-summary > strong {
+  color: #e2e8f0;
+  font-size: 1.4rem;
+}
+
+.rating-stars,
+.rating-picker {
+  display: inline-flex;
+  gap: 3px;
+  color: #64748b;
+  font-size: 1.4rem;
+}
+
+.rating-control {
+  display: grid;
+  gap: 8px;
+  color: #cbd5e1;
+}
+
+.rating-star-filled {
+  color: #fbbf24;
+}
+
+.rating-picker button {
+  padding: 0 2px;
+  border: 0;
+  background: transparent;
+  color: #64748b;
+  font-size: 1.7rem;
+  cursor: pointer;
+}
+
+.rating-picker button.rating-star-filled {
+  color: #fbbf24;
+}
+
+.course-note-form {
+  display: grid;
+  justify-items: start;
+  gap: 12px;
+}
+
+.course-note-form label {
+  display: grid;
+  width: 100%;
+  gap: 8px;
+  color: #cbd5e1;
+}
+
+.course-note-form textarea,
+.hole-photo-upload input[type="file"] {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #475569;
+  border-radius: 7px;
+  background: #0f172a;
+  color: #e2e8f0;
+  font: inherit;
+}
+
+.course-note-list {
+  display: grid;
+  gap: 10px;
+  list-style: none;
+}
+
+.course-note-list li {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  background: #0f172a;
+}
+
+.course-note-list p {
+  white-space: pre-wrap;
+}
+
+.hole-selector {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 4px 2px 10px;
+  scroll-snap-type: x mandatory;
+  scrollbar-color: #475569 #0f172a;
+}
+
+.hole-selector button {
+  display: grid;
+  width: 42px;
+  min-width: 42px;
+  height: 42px;
+  place-items: center;
+  border: 1px solid #475569;
+  border-radius: 6px;
+  background: #0f172a;
+  color: #cbd5e1;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  scroll-snap-align: center;
+}
+
+.hole-selector button:hover,
+.hole-selector button.selected {
+  border-color: #38bdf8;
+  background: #0c4a6e;
+  color: #e0f2fe;
+}
+
+.hole-note-card {
+  display: grid;
+  gap: 12px;
+  scroll-margin-top: 20px;
+  padding: 16px 0;
+  border-top: 1px solid #334155;
+}
+
+.hole-note-card h3 {
+  color: #bae6fd;
+  font-size: 1.1rem;
+}
+
+.hole-note-card h3 span {
+  color: #94a3b8;
+  font-size: .9rem;
+  font-weight: 400;
+}
+
+.hole-photo {
+  width: min(100%, 720px);
+  max-height: 420px;
+  border: 1px solid #475569;
+  border-radius: 8px;
+  background: #0f172a;
+  object-fit: contain;
+  object-position: left center;
+}
+
+.hole-photo-upload {
+  display: grid;
+  justify-items: start;
+  gap: 10px;
+  max-width: 520px;
+}
+
+.hole-photo-upload label {
+  display: grid;
+  gap: 8px;
+  color: #cbd5e1;
+  font-size: .9rem;
+}
+
 .stats-table th,
 .stats-table td {
   min-width: 100px;
@@ -798,6 +1082,29 @@ a.course-setup-badge:focus-visible {
 }
 
 @media (max-width: 600px) {
+  .course-notes-section {
+    padding: 14px;
+  }
+
+  .course-note-list li {
+    flex-direction: column;
+  }
+
+  .hole-entry-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .scorecard-entry,
+  .par-entry {
+    padding: 10px;
+  }
+
+  .scorecard-entry-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
   .round-card {
     padding: 18px;
   }

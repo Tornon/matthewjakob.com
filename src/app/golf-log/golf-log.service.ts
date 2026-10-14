@@ -38,6 +38,26 @@ export interface GolfCourse {
   backgroundImageUrl?: string | null;
 }
 
+export interface GolfCourseNote {
+  id: string;
+  courseName: string;
+  holeNumber: number | null;
+  note: string;
+  createdAt: string;
+}
+
+export interface GolfCourseRatingSummary {
+  totalRatings: number;
+  averageRating: number;
+  myRating: number;
+}
+
+export interface GolfCourseHoleImage {
+  holeNumber: number;
+  imagePath: string;
+  imageUrl: string;
+}
+
 export interface GolfFriendScore {
   name: string;
   holes: (number | null)[];
@@ -343,6 +363,192 @@ export class GolfLogService {
 
     if (error) {
       throw error;
+    }
+  }
+
+  async getCourseNotes(courseName: string): Promise<GolfCourseNote[]> {
+    const { data, error } = await (await this.getClient())
+      .from('golf_course_notes')
+      .select('id, course_name, hole_number, note, created_at')
+      .eq('course_name', courseName)
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      throw error;
+    }
+
+    return data.map((item) => ({
+      id: item.id,
+      courseName: item.course_name,
+      holeNumber: item.hole_number,
+      note: item.note,
+      createdAt: item.created_at
+    }));
+  }
+
+  async addCourseNote(courseName: string, holeNumber: number | null, note: string): Promise<void> {
+    const { error } = await (await this.getClient())
+      .from('golf_course_notes')
+      .insert({
+        course_name: courseName,
+        hole_number: holeNumber,
+        note: note.trim()
+      });
+
+    if (error) {
+      throw error;
+    }
+  }
+
+  async deleteCourseNote(id: string): Promise<void> {
+    const { data, error } = await (await this.getClient())
+      .from('golf_course_notes')
+      .delete()
+      .eq('id', id)
+      .select('id')
+      .maybeSingle();
+
+    if (error) {
+      throw error;
+    }
+    if (!data) {
+      throw new Error('The course note could not be found or removed.');
+    }
+  }
+
+  async getCourseRatingSummary(courseName: string): Promise<GolfCourseRatingSummary> {
+    const { data, error } = await (await this.getClient())
+      .rpc('get_golf_course_rating_summary', { p_course_name: courseName });
+
+    if (error) {
+      throw error;
+    }
+
+    const summary = data[0];
+    return {
+      totalRatings: Number(summary?.total_ratings ?? 0),
+      averageRating: Number(summary?.average_rating ?? 0),
+      myRating: summary?.my_rating ?? 0
+    };
+  }
+
+  async saveCourseRating(courseName: string, rating: number): Promise<void> {
+    const client = await this.getClient();
+    const { data: sessionData, error: sessionError } = await client.auth.getSession();
+    if (sessionError) {
+      throw sessionError;
+    }
+    if (!sessionData.session) {
+      throw new Error('Sign in as a golf log admin to rate this course.');
+    }
+
+    const { error } = await client
+      .from('golf_course_ratings')
+      .upsert(
+        { course_name: courseName, user_id: sessionData.session.user.id, rating },
+        { onConflict: 'course_name,user_id' }
+      );
+
+    if (error) {
+      throw error;
+    }
+  }
+
+  async getCourseHoleImages(courseName: string): Promise<GolfCourseHoleImage[]> {
+    const { data, error } = await (await this.getClient())
+      .from('golf_course_holes')
+      .select('hole_number, image_path')
+      .eq('course_name', courseName)
+      .order('hole_number', { ascending: true });
+
+    if (error) {
+      throw error;
+    }
+
+    const client = await this.getClient();
+    return data.map((item) => ({
+      holeNumber: item.hole_number,
+      imagePath: item.image_path,
+      imageUrl: client.storage.from('golf-course-images').getPublicUrl(item.image_path).data.publicUrl
+    }));
+  }
+
+  async uploadCourseHoleImage(
+    courseName: string,
+    holeNumber: number,
+    file: File
+  ): Promise<void> {
+    const client = await this.getClient();
+    const extension = file.type === 'image/jpeg' ? 'jpg' : file.type.slice('image/'.length);
+    const path = `holes/${encodeURIComponent(courseName)}/hole-${holeNumber}-${crypto.randomUUID()}.${extension}`;
+    const { error: uploadError } = await client.storage
+      .from('golf-course-images')
+      .upload(path, file, { contentType: file.type, upsert: false });
+
+    if (uploadError) {
+      throw uploadError;
+    }
+
+    const { data: previous, error: readError } = await client
+      .from('golf_course_holes')
+      .select('image_path')
+      .eq('course_name', courseName)
+      .eq('hole_number', holeNumber)
+      .maybeSingle();
+    if (readError) {
+      const { error: cleanupError } = await client.storage.from('golf-course-images').remove([path]);
+      if (cleanupError) {
+        throw new Error(`${readError.message} The new image could not be cleaned up: ${cleanupError.message}`);
+      }
+      throw readError;
+    }
+
+    const { error: saveError } = await client
+      .from('golf_course_holes')
+      .upsert(
+        { course_name: courseName, hole_number: holeNumber, image_path: path },
+        { onConflict: 'course_name,hole_number' }
+      );
+    if (saveError) {
+      const { error: cleanupError } = await client.storage.from('golf-course-images').remove([path]);
+      if (cleanupError) {
+        throw new Error(`${saveError.message} The new image could not be cleaned up: ${cleanupError.message}`);
+      }
+      throw saveError;
+    }
+
+    if (previous?.image_path) {
+      const { error: removeError } = await client.storage
+        .from('golf-course-images')
+        .remove([previous.image_path]);
+      if (removeError) {
+        throw new Error(`The new hole photo was saved, but the previous photo could not be removed: ${removeError.message}`);
+      }
+    }
+  }
+
+  async deleteCourseHoleImage(courseName: string, holeNumber: number): Promise<void> {
+    const client = await this.getClient();
+    const { data, error } = await client
+      .from('golf_course_holes')
+      .delete()
+      .eq('course_name', courseName)
+      .eq('hole_number', holeNumber)
+      .select('image_path')
+      .maybeSingle();
+
+    if (error) {
+      throw error;
+    }
+    if (!data) {
+      throw new Error('The hole photo could not be found or removed.');
+    }
+
+    const { error: removeError } = await client.storage
+      .from('golf-course-images')
+      .remove([data.image_path]);
+    if (removeError) {
+      throw new Error(`The hole photo record was removed, but its file could not be deleted: ${removeError.message}`);
     }
   }
 

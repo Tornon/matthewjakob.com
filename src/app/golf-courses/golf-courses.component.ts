@@ -69,6 +69,13 @@ interface RoundPlayerStats {
         @if (selectedCourse && courses.length > 0) {
           <section class="course-details" aria-labelledby="course-heading">
             <h2 id="course-heading">{{ allCoursesSelected ? 'All Courses' : selectedCourse }}</h2>
+            @if (!allCoursesSelected) {
+              <a
+                class="secondary-button course-notes-link"
+                routerLink="/golf-course-notes"
+                [queryParams]="{ course: selectedCourse }"
+              >Course notes &amp; ratings</a>
+            }
             @if (!allCoursesSelected && !selectedConfig) {
               <div class="course-setup-notice">
                 <span class="course-setup-badge">Par setup needed</span>
@@ -209,7 +216,8 @@ interface RoundPlayerStats {
                 list="course-names"
                 maxlength="160"
                 required
-                [(ngModel)]="configCourseName"
+                [ngModel]="configCourseName"
+                (ngModelChange)="selectConfigurationCourse($event)"
               >
               <datalist id="course-names">
                 @for (course of courses; track course) {
@@ -217,16 +225,36 @@ interface RoundPlayerStats {
                 }
               </datalist>
             </label>
-            <label class="wide-field">
-              Hole pars, in order (comma-separated)
-              <input
-                name="pars"
-                type="text"
-                required
-                placeholder="4, 4, 3, 5, 4, 4, 3, 5, 4"
-                [(ngModel)]="parsInput"
+            <label>
+              Holes configured
+              <select
+                name="parHoleCount"
+                [ngModel]="parHoleCount"
+                (ngModelChange)="setParHoleCount($event)"
               >
+                <option [ngValue]="9">9 holes</option>
+                <option [ngValue]="18">18 holes</option>
+              </select>
             </label>
+            <fieldset class="par-entry wide-field">
+              <legend>Par for each hole</legend>
+              <div class="hole-entry-grid par-entry-grid">
+                @for (par of pars; track $index; let holeIndex = $index) {
+                  <label>
+                    Hole {{ holeIndex + 1 }}
+                    <input
+                      [name]="'par-' + holeIndex"
+                      type="number"
+                      min="3"
+                      max="6"
+                      step="1"
+                      inputmode="numeric"
+                      [(ngModel)]="pars[holeIndex]"
+                    >
+                  </label>
+                }
+              </div>
+            </fieldset>
           </div>
           @if (selectedConfig && !allCoursesSelected) {
             <section class="course-image-settings" aria-labelledby="course-image-heading">
@@ -306,7 +334,7 @@ interface RoundPlayerStats {
             </section>
           }
           <p class="form-help">
-            Enter 9 or 18 pars in hole order. Each par must be a whole number from 3 to 6.
+            Enter a par from 3 to 6 for every hole.
             For a 9-hole scorecard on an 18-hole course, choose front or back nine when adding
             the round in the Golf Log.
           </p>
@@ -336,7 +364,8 @@ export class GolfCoursesComponent implements OnInit {
   selectedCourse = '';
   selectedPlayer = '';
   configCourseName = '';
-  parsInput = '';
+  parHoleCount: 9 | 18 = 18;
+  pars: (number | null)[] = Array.from({ length: 18 }, () => null);
   backgroundImageOpacity = 0.12;
   backgroundImagePositionX = 50;
   backgroundImagePositionY = 50;
@@ -556,11 +585,38 @@ export class GolfCoursesComponent implements OnInit {
     this.selectedPlayer = '';
     this.configCourseName = course === this.allCoursesValue ? '' : course;
     const config = this.courseConfigs.find((item) => item.name === course);
-    this.parsInput = config?.pars.join(', ') ?? '';
+    this.parHoleCount = config?.pars.length === 9 ? 9 : 18;
+    this.pars = config
+      ? [...config.pars]
+      : Array.from({ length: this.parHoleCount }, () => null);
+    if (this.pars.length !== this.parHoleCount) {
+      this.pars = Array.from(
+        { length: this.parHoleCount },
+        (_, index) => this.pars[index] ?? null
+      );
+    }
     this.backgroundImageOpacity = config?.backgroundImageOpacity ?? 0.12;
     this.backgroundImagePositionX = config?.backgroundImagePositionX ?? 50;
     this.backgroundImagePositionY = config?.backgroundImagePositionY ?? 50;
     this.selectedBackgroundFile = null;
+  }
+
+  selectConfigurationCourse(courseName: string): void {
+    this.configCourseName = courseName;
+    const existingCourse = this.courses.find(
+      (course) => course.toLocaleLowerCase() === courseName.trim().toLocaleLowerCase()
+    );
+    if (existingCourse) {
+      this.selectCourse(existingCourse);
+    }
+  }
+
+  setParHoleCount(holeCount: 9 | 18): void {
+    this.parHoleCount = holeCount;
+    this.pars = Array.from(
+      { length: holeCount },
+      (_, index) => this.pars[index] ?? null
+    );
   }
 
   selectBackgroundImage(event: Event): void {
@@ -653,14 +709,10 @@ export class GolfCoursesComponent implements OnInit {
         throw new Error('Enter a course name between 1 and 160 characters.');
       }
 
-      const tokens = this.parsInput.split(',').map((token) => token.trim());
-      if (![9, 18].includes(tokens.length)) {
-        throw new Error('Enter exactly 9 or 18 hole pars.');
-      }
-
-      const pars = tokens.map((token) => Number(token));
-      if (pars.some((par) => !Number.isInteger(par) || par < 3 || par > 6)) {
-        throw new Error('Each hole par must be a whole number from 3 to 6.');
+      const pars = this.pars.filter((par): par is number => par !== null);
+      if (pars.length !== this.parHoleCount ||
+          pars.some((par) => !Number.isInteger(par) || par < 3 || par > 6)) {
+        throw new Error('Enter a whole-number par from 3 to 6 for every hole.');
       }
 
       await this.golfLog.saveCourseConfig(name, pars);
@@ -668,7 +720,8 @@ export class GolfCoursesComponent implements OnInit {
       this.selectedCourse = name;
       this.selectedPlayer = '';
       this.configCourseName = name;
-      this.parsInput = pars.join(', ');
+      this.parHoleCount = pars.length as 9 | 18;
+      this.pars = [...pars];
       this.notice = `Pars saved for ${name}.`;
     } catch (error) {
       console.error('Unable to save course configuration.', error);
