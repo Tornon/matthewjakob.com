@@ -1,0 +1,371 @@
+import { Injectable } from '@angular/core';
+import { createClient, type Session, type SupabaseClient } from '@supabase/supabase-js';
+
+export interface GolfRound {
+  id: string;
+  date: string;
+  course: string;
+  playerName: string;
+  score: number;
+  holes: (number | null)[];
+  friends: GolfFriendScore[];
+}
+
+export interface GolfFriendScore {
+  name: string;
+  holes: (number | null)[];
+}
+
+export interface ImportedGolfRound {
+  date: string;
+  course: string;
+  playerName?: string;
+  score: number;
+  holes: (number | null)[];
+  friends?: GolfFriendScore[];
+}
+
+export interface ParsedGolfImport {
+  rounds: ImportedGolfRound[];
+  skippedWithoutScores: number;
+}
+
+interface SupabaseConfig {
+  url: string;
+  anonKey: string;
+}
+
+interface DatabaseGolfRound {
+  id: string;
+  played_on: string;
+  course: string;
+  player_name: string;
+  total_strokes: number;
+  hole_strokes: (number | null)[];
+  friend_scores: GolfFriendScore[];
+}
+
+export function isGolfRoundData(value: unknown): value is { rounds: ImportedGolfRound[] } {
+  if (typeof value !== 'object' || value === null || !('rounds' in value)) {
+    return false;
+  }
+
+  return Array.isArray(value.rounds) && value.rounds.every((round: unknown) => {
+    if (typeof round !== 'object' || round === null) {
+      return false;
+    }
+
+    return (
+      'date' in round &&
+      typeof round.date === 'string' &&
+      /^\d{4}-\d{2}-\d{2}$/.test(round.date) &&
+      'course' in round &&
+      typeof round.course === 'string' &&
+      round.course.trim().length > 0 &&
+      (!('playerName' in round) ||
+        (typeof round.playerName === 'string' && round.playerName.trim().length > 0)) &&
+      'score' in round &&
+      typeof round.score === 'number' &&
+      Number.isInteger(round.score) &&
+      round.score > 0 &&
+      'holes' in round &&
+      Array.isArray(round.holes) &&
+      [9, 18].includes(round.holes.length) &&
+      round.holes.every(
+        (strokes: unknown) =>
+          strokes === null ||
+          (typeof strokes === 'number' && Number.isInteger(strokes) && strokes > 0)
+      )
+    );
+  });
+}
+
+export function parseGolfImportData(value: unknown): ParsedGolfImport {
+  if (isGolfRoundData(value)) {
+    let skippedWithoutScores = 0;
+    const rounds = value.rounds.flatMap((round) => {
+      const score = round.holes.reduce<number>((total, strokes) => total + (strokes ?? 0), 0);
+      if (score < 1) {
+        skippedWithoutScores++;
+        return [];
+      }
+      return [{ ...round, score }];
+    });
+    return { rounds, skippedWithoutScores };
+  }
+
+  if (typeof value !== 'object' || value === null || !('myData' in value)) {
+    throw new Error('Choose an 18Birdies JSON export or a sanitized golf rounds JSON file.');
+  }
+
+  const myData = value.myData;
+  if (
+    typeof myData !== 'object' ||
+    myData === null ||
+    !('activityData' in myData) ||
+    typeof myData.activityData !== 'object' ||
+    myData.activityData === null ||
+    !('rounds' in myData.activityData) ||
+    !Array.isArray(myData.activityData.rounds) ||
+    !('clubData' in myData) ||
+    typeof myData.clubData !== 'object' ||
+    myData.clubData === null ||
+    !('playedClubs' in myData.clubData) ||
+    !Array.isArray(myData.clubData.playedClubs)
+  ) {
+    throw new Error('The 18Birdies file is missing its round or course data.');
+  }
+
+  const courses = new Map<string, string>();
+  for (const club of myData.clubData.playedClubs) {
+    if (
+      typeof club === 'object' &&
+      club !== null &&
+      'clubId' in club &&
+      typeof club.clubId === 'string' &&
+      'name' in club &&
+      typeof club.name === 'string' &&
+      club.name.trim()
+    ) {
+      courses.set(club.clubId, club.name.trim());
+    }
+  }
+
+  let playerName = 'You';
+  if (
+    'accountData' in myData &&
+    typeof myData.accountData === 'object' &&
+    myData.accountData !== null &&
+    'userName' in myData.accountData &&
+    typeof myData.accountData.userName === 'string' &&
+    myData.accountData.userName.trim()
+  ) {
+    playerName = myData.accountData.userName.trim().slice(0, 80);
+  }
+
+  let skippedWithoutScores = 0;
+  const rounds = myData.activityData.rounds.flatMap((round, index) => {
+    if (typeof round !== 'object' || round === null) {
+      throw new Error(`18Birdies round ${index + 1} has an unsupported format.`);
+    }
+
+    const timestamp = 'timestamp' in round ? round.timestamp : undefined;
+    const courseId =
+      'clubId' in round &&
+      typeof round.clubId === 'object' &&
+      round.clubId !== null &&
+      'id' in round.clubId &&
+      typeof round.clubId.id === 'string'
+        ? round.clubId.id
+        : undefined;
+    const course = courseId ? courses.get(courseId) : undefined;
+    const holeStrokes = 'holeStrokes' in round ? round.holeStrokes : undefined;
+    const date = typeof timestamp === 'number' ? new Date(timestamp) : new Date(Number.NaN);
+
+    if (
+      !course ||
+      !Number.isFinite(date.getTime()) ||
+      !Array.isArray(holeStrokes) ||
+      ![9, 18].includes(holeStrokes.length) ||
+      !holeStrokes.every(
+        (strokes: unknown) =>
+          typeof strokes === 'number' && Number.isInteger(strokes) && strokes >= 0
+      )
+    ) {
+      throw new Error(`18Birdies round ${index + 1} has missing or unsupported course, date, or hole scores.`);
+    }
+
+    const holes = holeStrokes.map((strokes) => (strokes === 0 ? null : strokes));
+    const score = holes.reduce<number>((total, strokes) => total + (strokes ?? 0), 0);
+    if (score < 1) {
+      skippedWithoutScores++;
+      return [];
+    }
+
+    return [{
+      date: date.toISOString().slice(0, 10),
+      course,
+      playerName,
+      score,
+      holes
+    }];
+  });
+  return { rounds, skippedWithoutScores };
+}
+
+@Injectable({ providedIn: 'root' })
+export class GolfLogService {
+  private clientPromise?: Promise<SupabaseClient>;
+
+  async getClient(): Promise<SupabaseClient> {
+    this.clientPromise ??= this.createConfiguredClient();
+    return this.clientPromise;
+  }
+
+  async getSession(): Promise<Session | null> {
+    const { data, error } = await (await this.getClient()).auth.getSession();
+    if (error) {
+      throw error;
+    }
+    return data.session;
+  }
+
+  async onAuthStateChange(
+    callback: (session: Session | null) => void
+  ): Promise<() => void> {
+    const { data } = (await this.getClient()).auth.onAuthStateChange((_event, session) => {
+      callback(session);
+    });
+    return () => data.subscription.unsubscribe();
+  }
+
+  async signIn(email: string, password: string): Promise<void> {
+    const { error } = await (await this.getClient()).auth.signInWithPassword({
+      email,
+      password
+    });
+    if (error) {
+      throw error;
+    }
+  }
+
+  async signOut(): Promise<void> {
+    const { error } = await (await this.getClient()).auth.signOut();
+    if (error) {
+      throw error;
+    }
+  }
+
+  async isAdmin(): Promise<boolean> {
+    const { data, error } = await (await this.getClient()).rpc('is_golf_log_admin');
+    if (error) {
+      throw error;
+    }
+    return data === true;
+  }
+
+  async getRounds(): Promise<GolfRound[]> {
+    const { data, error } = await (await this.getClient())
+      .from('golf_rounds')
+      .select('id, played_on, course, player_name, total_strokes, hole_strokes, friend_scores')
+      .order('played_on', { ascending: false })
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      throw error;
+    }
+
+    return (data as DatabaseGolfRound[]).map((round) => {
+      if (!Array.isArray(round.hole_strokes) || !Array.isArray(round.friend_scores)) {
+        throw new Error(
+          'A round has no scorecard data. Verify that the friends migration was applied in Supabase and reload the page.'
+        );
+      }
+
+      return {
+        id: round.id,
+        date: round.played_on,
+        course: round.course,
+        playerName: round.player_name,
+        score: round.total_strokes,
+        holes: round.hole_strokes,
+        friends: round.friend_scores
+      };
+    });
+  }
+
+  async addRound(round: ImportedGolfRound): Promise<void> {
+    const { error } = await (await this.getClient()).from('golf_rounds').insert({
+      played_on: round.date,
+      course: round.course.trim(),
+      player_name: round.playerName?.trim() || 'You',
+      total_strokes: round.score,
+      hole_strokes: round.holes,
+      friend_scores: round.friends ?? []
+    });
+
+    if (error) {
+      throw error;
+    }
+  }
+
+  async updateRound(id: string, round: ImportedGolfRound): Promise<void> {
+    const { error } = await (await this.getClient())
+      .from('golf_rounds')
+      .update({
+        played_on: round.date,
+        course: round.course.trim(),
+        player_name: round.playerName?.trim() || 'You',
+        total_strokes: round.score,
+        hole_strokes: round.holes,
+        friend_scores: round.friends ?? []
+      })
+      .eq('id', id);
+
+    if (error) {
+      throw error;
+    }
+  }
+
+  async importRounds(rounds: ImportedGolfRound[]): Promise<number> {
+    const client = await this.getClient();
+    let inserted = 0;
+
+    for (let index = 0; index < rounds.length; index += 100) {
+      const batch = rounds.slice(index, index + 100);
+      const { data, error } = await client
+        .from('golf_rounds')
+        .upsert(
+          batch.map((round) => ({
+            played_on: round.date,
+            course: round.course.trim(),
+            player_name: round.playerName?.trim() || 'You',
+            total_strokes: round.score,
+            hole_strokes: round.holes,
+            friend_scores: []
+          })),
+          {
+            onConflict: 'played_on,course,total_strokes,hole_strokes',
+            ignoreDuplicates: true
+          }
+        )
+        .select('id');
+
+      if (error) {
+        throw new Error(`Import stopped after ${inserted} rounds: ${error.message}`);
+      }
+
+      inserted += data.length;
+    }
+
+    return inserted;
+  }
+
+  private async createConfiguredClient(): Promise<SupabaseClient> {
+    const response = await fetch('config.json');
+    if (!response.ok) {
+      throw new Error(`Could not load site configuration (HTTP ${response.status}).`);
+    }
+
+    const config: unknown = await response.json();
+    if (
+      typeof config !== 'object' ||
+      config === null ||
+      !('url' in config) ||
+      typeof config.url !== 'string' ||
+      !('anonKey' in config) ||
+      typeof config.anonKey !== 'string' ||
+      !config.url.trim() ||
+      !config.anonKey.trim()
+    ) {
+      throw new Error('Supabase is not configured. Set the project URL and anon key in config.json.');
+    }
+
+    return createClient(config.url, config.anonKey, {
+      auth: {
+        autoRefreshToken: true,
+        persistSession: true
+      }
+    });
+  }
+}
