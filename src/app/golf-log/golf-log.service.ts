@@ -31,6 +31,9 @@ export function courseHoleIndex(
 export interface GolfCourse {
   name: string;
   pars: number[];
+  backgroundImagePath?: string | null;
+  backgroundImageOpacity?: number;
+  backgroundImageUrl?: string | null;
 }
 
 export interface GolfFriendScore {
@@ -308,14 +311,23 @@ export class GolfLogService {
   async getCourseConfigs(): Promise<GolfCourse[]> {
     const { data, error } = await (await this.getClient())
       .from('golf_courses')
-      .select('name, pars')
+      .select('name, pars, background_image_path, background_image_opacity')
       .order('name', { ascending: true });
 
     if (error) {
       throw error;
     }
 
-    return data as GolfCourse[];
+    const client = await this.getClient();
+    return data.map((course) => ({
+      name: course.name,
+      pars: course.pars,
+      backgroundImagePath: course.background_image_path,
+      backgroundImageOpacity: course.background_image_opacity,
+      backgroundImageUrl: course.background_image_path
+        ? client.storage.from('golf-course-images').getPublicUrl(course.background_image_path).data.publicUrl
+        : null
+    }));
   }
 
   async saveCourseConfig(name: string, pars: number[]): Promise<void> {
@@ -325,6 +337,57 @@ export class GolfLogService {
 
     if (error) {
       throw error;
+    }
+  }
+
+  async uploadCourseBackground(name: string, file: File, opacity: number): Promise<void> {
+    const client = await this.getClient();
+    const extension = file.type === 'image/jpeg' ? 'jpg' : file.type.slice('image/'.length);
+    const path = `${crypto.randomUUID()}.${extension}`;
+    const { error: uploadError } = await client.storage
+      .from('golf-course-images')
+      .upload(path, file, { contentType: file.type, upsert: false });
+
+    if (uploadError) {
+      throw uploadError;
+    }
+
+    const { data, error: updateError } = await client
+      .from('golf_courses')
+      .update({
+        background_image_path: path,
+        background_image_opacity: opacity
+      })
+      .eq('name', name.trim())
+      .select('background_image_path')
+      .maybeSingle();
+
+    if (updateError || !data) {
+      const { error: cleanupError } = await client.storage
+        .from('golf-course-images')
+        .remove([path]);
+      const reason = updateError?.message
+        ?? 'Course configuration was not found. Save its pars before uploading an image.';
+      if (cleanupError) {
+        throw new Error(`${reason} The uploaded file could not be cleaned up: ${cleanupError.message}`);
+      }
+      throw new Error(reason);
+    }
+  }
+
+  async updateCourseBackgroundOpacity(name: string, opacity: number): Promise<void> {
+    const { data, error } = await (await this.getClient())
+      .from('golf_courses')
+      .update({ background_image_opacity: opacity })
+      .eq('name', name.trim())
+      .select('name')
+      .maybeSingle();
+
+    if (error) {
+      throw error;
+    }
+    if (!data) {
+      throw new Error('Course configuration was not found. Save its pars before changing image opacity.');
     }
   }
 

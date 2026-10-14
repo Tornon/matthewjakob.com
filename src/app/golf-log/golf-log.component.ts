@@ -77,6 +77,15 @@ import {
           <ol class="round-list" aria-label="Golf rounds">
             @for (round of filteredRounds; track round.id) {
               <li class="round-card">
+                @if (courseWatermark(round); as watermark) {
+                  <img
+                    class="round-card-watermark"
+                    [src]="watermark.url"
+                    [style.opacity]="watermark.opacity"
+                    alt=""
+                    aria-hidden="true"
+                  >
+                }
                 <div class="round-heading">
                   <div>
                     <h2>{{ roundTitle(round) }}</h2>
@@ -601,6 +610,18 @@ export class GolfLogComponent implements OnInit, OnDestroy {
     return this.courseConfigs.some((course) =>
       course.name.toLocaleLowerCase() === courseName.toLocaleLowerCase()
     );
+  }
+
+  courseWatermark(round: GolfRound): { url: string; opacity: number } | null {
+    const course = this.courseConfigs.find(
+      (config) => config.name.toLocaleLowerCase() === round.course.toLocaleLowerCase()
+    );
+    return course?.backgroundImageUrl
+      ? {
+          url: course.backgroundImageUrl,
+          opacity: course.backgroundImageOpacity ?? 0.12
+        }
+      : null;
   }
 
   clearPlayerFilter(): void {

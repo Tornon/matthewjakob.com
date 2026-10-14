@@ -16,9 +16,11 @@ interface CoursePlayerScore {
 
 interface HoleStats {
   number: number;
-  par: number;
+  par: number | null;
   recorded: number;
   strokes: number;
+  eagles: number;
+  holeInOnes: number;
   birdies: number;
   pars: number;
   bogeys: number;
@@ -29,6 +31,7 @@ interface HoleStats {
 
 interface RoundPlayerStats {
   date: string;
+  course: string;
   player: string;
   score: number | null;
   par: number | null;
@@ -53,6 +56,7 @@ interface RoundPlayerStats {
           <label class="course-filter">
             Course
             <select name="selectedCourse" [ngModel]="selectedCourse" (ngModelChange)="selectCourse($event)">
+              <option [value]="allCoursesValue">All Courses</option>
               @for (course of courses; track course) {
                 <option [value]="course">
                   {{ course }}{{ isCourseConfigured(course) ? '' : ' — Setup needed' }}
@@ -62,10 +66,10 @@ interface RoundPlayerStats {
           </label>
         }
 
-        @if (selectedCourse) {
+        @if (selectedCourse && courses.length > 0) {
           <section class="course-details" aria-labelledby="course-heading">
-            <h2 id="course-heading">{{ selectedCourse }}</h2>
-            @if (!selectedConfig) {
+            <h2 id="course-heading">{{ allCoursesSelected ? 'All Courses' : selectedCourse }}</h2>
+            @if (!allCoursesSelected && !selectedConfig) {
               <div class="course-setup-notice">
                 <span class="course-setup-badge">Par setup needed</span>
                 <p>Hole-by-hole stats are unavailable until this course's pars are configured.</p>
@@ -84,42 +88,64 @@ interface RoundPlayerStats {
                 </select>
               </label>
               <p class="form-help">
-                Averages and counts include recorded holes only. Birdie or better includes
-                eagles and better; worse means four or more over par.
+                Averages and counts include recorded holes only. Eagles exclude hole-in-ones;
+                worse means four or more over par. All-course hole stats use each course's
+                configured pars.
               </p>
-              <div class="scorecard-scroll">
-                <table class="scorecard stats-table">
-                  <caption>{{ selectedCourse }} hole statistics</caption>
-                  <thead>
-                    <tr>
-                      <th scope="col">Hole</th>
-                      <th scope="col">Par</th>
-                      <th scope="col">Avg. strokes</th>
-                      <th scope="col">Birdie or better</th>
-                      <th scope="col">Par</th>
-                      <th scope="col">Bogey</th>
-                      <th scope="col">Double bogey</th>
-                      <th scope="col">Triple bogey</th>
-                      <th scope="col">Worse</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    @for (hole of holeStats; track hole.number) {
+              @if (holeStats.length === 0) {
+                <p class="log-status">No configured course pars are available for hole statistics.</p>
+              } @else {
+                <div class="scorecard-scroll">
+                  <table class="scorecard stats-table">
+                    <caption>{{ allCoursesSelected ? 'All courses' : selectedCourse }} hole statistics</caption>
+                    <thead>
                       <tr>
-                        <th scope="row">{{ hole.number }}</th>
-                        <td>{{ hole.par }}</td>
-                        <td>{{ hole.recorded ? (hole.strokes / hole.recorded).toFixed(2) : '-' }}</td>
-                        <td>{{ hole.birdies }}</td>
-                        <td>{{ hole.pars }}</td>
-                        <td>{{ hole.bogeys }}</td>
-                        <td>{{ hole.doubleBogeys }}</td>
-                        <td>{{ hole.tripleBogeys }}</td>
-                        <td>{{ hole.worse }}</td>
+                        <th scope="col">Hole</th>
+                        <th scope="col">Par</th>
+                        <th scope="col">Avg. strokes</th>
+                        <th scope="col">Birdie</th>
+                        <th scope="col">Par</th>
+                        <th scope="col">Bogey</th>
+                        <th scope="col">Double bogey</th>
+                        <th scope="col">Triple bogey</th>
+                        <th scope="col">Worse</th>
+                        <th scope="col">Eagle</th>
+                        <th scope="col">Hole-in-one</th>
                       </tr>
-                    }
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      @for (hole of holeStats; track hole.number) {
+                        <tr>
+                          <th scope="row">{{ hole.number }}</th>
+                          <td>{{ hole.par ?? '-' }}</td>
+                          <td>{{ hole.recorded ? (hole.strokes / hole.recorded).toFixed(2) : '-' }}</td>
+                          <td>{{ hole.birdies }}</td>
+                          <td>{{ hole.pars }}</td>
+                          <td>{{ hole.bogeys }}</td>
+                          <td>{{ hole.doubleBogeys }}</td>
+                          <td>{{ hole.tripleBogeys }}</td>
+                          <td>{{ hole.worse }}</td>
+                          <td>{{ hole.eagles }}</td>
+                          <td>{{ hole.holeInOnes }}</td>
+                        </tr>
+                      }
+                      <tr class="stats-total-row">
+                        <th scope="row">Total</th>
+                        <td>-</td>
+                        <td>{{ totalHoleStats.recorded ? (totalHoleStats.strokes / totalHoleStats.recorded).toFixed(2) : '-' }}</td>
+                        <td>{{ totalHoleStats.birdies }}</td>
+                        <td>{{ totalHoleStats.pars }}</td>
+                        <td>{{ totalHoleStats.bogeys }}</td>
+                        <td>{{ totalHoleStats.doubleBogeys }}</td>
+                        <td>{{ totalHoleStats.tripleBogeys }}</td>
+                        <td>{{ totalHoleStats.worse }}</td>
+                        <td>{{ totalHoleStats.eagles }}</td>
+                        <td>{{ totalHoleStats.holeInOnes }}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              }
 
               <h3 class="course-section-heading">Round results</h3>
               @if (roundPlayerStats.length === 0) {
@@ -127,10 +153,13 @@ interface RoundPlayerStats {
               } @else {
                 <div class="scorecard-scroll">
                   <table class="scorecard stats-table">
-                    <caption>{{ selectedCourse }} round results</caption>
+                    <caption>{{ allCoursesSelected ? 'All courses' : selectedCourse }} round results</caption>
                     <thead>
                       <tr>
                         <th scope="col">Date</th>
+                        @if (allCoursesSelected) {
+                          <th scope="col">Course</th>
+                        }
                         <th scope="col">Player</th>
                         <th scope="col">Strokes</th>
                         <th scope="col">Par</th>
@@ -141,6 +170,9 @@ interface RoundPlayerStats {
                       @for (result of roundPlayerStats; track $index) {
                         <tr>
                           <td>{{ formatDate(result.date) }}</td>
+                          @if (allCoursesSelected) {
+                            <td>{{ result.course }}</td>
+                          }
                           <th scope="row">{{ result.player }}</th>
                           <td>{{ result.score ?? '-' }}</td>
                           <td>{{ result.par ?? '-' }}</td>
@@ -196,6 +228,58 @@ interface RoundPlayerStats {
               >
             </label>
           </div>
+          @if (selectedConfig && !allCoursesSelected) {
+            <section class="course-image-settings" aria-labelledby="course-image-heading">
+              <h3 id="course-image-heading">Scorecard watermark</h3>
+              @if (selectedConfig.backgroundImageUrl) {
+                <img
+                  class="course-image-preview"
+                  [src]="selectedConfig.backgroundImageUrl"
+                  alt="Preview of the scorecard watermark for {{ selectedCourse }}"
+                  [style.opacity]="backgroundImageOpacity"
+                >
+                <label>
+                  Watermark opacity: {{ (backgroundImageOpacity * 100).toFixed(0) }}%
+                  <input
+                    name="backgroundImageOpacity"
+                    type="range"
+                    min="0.03"
+                    max="0.5"
+                    step="0.01"
+                    [(ngModel)]="backgroundImageOpacity"
+                  >
+                </label>
+                <button
+                  type="button"
+                  class="secondary-button"
+                  [disabled]="saving"
+                  (click)="saveBackgroundOpacity()"
+                >Save opacity</button>
+              } @else {
+                <p class="form-help">Upload an image to show as a faint watermark behind this course's scorecards.</p>
+              }
+              <label>
+                Course image (JPEG, PNG, or WebP; up to 5 MB)
+                <input
+                  name="courseBackgroundImage"
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  [disabled]="saving"
+                  (change)="selectBackgroundImage($event)"
+                >
+              </label>
+              @if (selectedBackgroundFile) {
+                <p class="form-help">Selected: {{ selectedBackgroundFile.name }}</p>
+              }
+              <button
+                type="button"
+                [disabled]="saving || !selectedBackgroundFile"
+                (click)="uploadBackgroundImage()"
+              >
+                {{ saving ? 'Uploading...' : 'Upload course image' }}
+              </button>
+            </section>
+          }
           <p class="form-help">
             Enter 9 or 18 pars in hole order. Each par must be a whole number from 3 to 6.
             For a 9-hole scorecard on an 18-hole course, choose front or back nine when adding
@@ -214,6 +298,8 @@ interface RoundPlayerStats {
   `
 })
 export class GolfCoursesComponent implements OnInit {
+  readonly allCoursesValue = '__all_courses__';
+
   rounds: GolfRound[] = [];
   courseConfigs: GolfCourse[] = [];
   loading = true;
@@ -226,6 +312,8 @@ export class GolfCoursesComponent implements OnInit {
   selectedPlayer = '';
   configCourseName = '';
   parsInput = '';
+  backgroundImageOpacity = 0.12;
+  selectedBackgroundFile: File | null = null;
 
   constructor(
     private readonly golfLog: GolfLogService,
@@ -239,6 +327,10 @@ export class GolfCoursesComponent implements OnInit {
     ])].sort((left, right) => left.localeCompare(right));
   }
 
+  get allCoursesSelected(): boolean {
+    return this.selectedCourse === this.allCoursesValue;
+  }
+
   get selectedConfig(): GolfCourse | undefined {
     return this.courseConfigs.find((course) => course.name === this.selectedCourse);
   }
@@ -250,7 +342,9 @@ export class GolfCoursesComponent implements OnInit {
   }
 
   get selectedCourseRounds(): GolfRound[] {
-    return this.rounds.filter((round) => round.course === this.selectedCourse);
+    return this.allCoursesSelected
+      ? this.rounds
+      : this.rounds.filter((round) => round.course === this.selectedCourse);
   }
 
   get players(): string[] {
@@ -260,16 +354,20 @@ export class GolfCoursesComponent implements OnInit {
   }
 
   get holeStats(): HoleStats[] {
-    const pars = this.selectedConfig?.pars;
-    if (!pars) {
+    const holeCount = this.allCoursesSelected
+      ? Math.max(0, ...this.courseConfigs.map((course) => course.pars.length))
+      : this.selectedConfig?.pars.length ?? 0;
+    if (holeCount === 0) {
       return [];
     }
 
-    const stats = pars.map((par, index) => ({
+    const stats = Array.from({ length: holeCount }, (_, index) => ({
       number: index + 1,
-      par,
+      par: this.allCoursesSelected ? null : this.selectedConfig?.pars[index] ?? null,
       recorded: 0,
       strokes: 0,
+      eagles: 0,
+      holeInOnes: 0,
       birdies: 0,
       pars: 0,
       bogeys: 0,
@@ -279,6 +377,10 @@ export class GolfCoursesComponent implements OnInit {
     }));
 
     for (const round of this.selectedCourseRounds) {
+      const coursePars = this.courseConfigs.find((course) => course.name === round.course)?.pars;
+      if (!coursePars) {
+        continue;
+      }
       for (const player of this.roundPlayers(round)) {
         if (!this.matchesSelectedPlayer(player.name)) {
           continue;
@@ -287,27 +389,32 @@ export class GolfCoursesComponent implements OnInit {
         for (let index = 0; index < player.holes.length; index += 1) {
           const strokes = player.holes[index];
           const parIndex = courseHoleIndex(
-            pars.length,
+            coursePars.length,
             round.holes,
             round.startingHole,
             index
           );
-          if (strokes === null || parIndex === null) {
+          if (strokes === null || parIndex === null || parIndex >= stats.length) {
             continue;
           }
 
           const hole = stats[parIndex];
+          const par = coursePars[parIndex];
           hole.recorded += 1;
           hole.strokes += strokes;
-          if (strokes < hole.par) {
+          if (strokes === 1) {
+            hole.holeInOnes += 1;
+          } else if (strokes <= par - 2) {
+            hole.eagles += 1;
+          } else if (strokes === par - 1) {
             hole.birdies += 1;
-          } else if (strokes === hole.par) {
+          } else if (strokes === par) {
             hole.pars += 1;
-          } else if (strokes === hole.par + 1) {
+          } else if (strokes === par + 1) {
             hole.bogeys += 1;
-          } else if (strokes === hole.par + 2) {
+          } else if (strokes === par + 2) {
             hole.doubleBogeys += 1;
-          } else if (strokes === hole.par + 3) {
+          } else if (strokes === par + 3) {
             hole.tripleBogeys += 1;
           } else {
             hole.worse += 1;
@@ -319,16 +426,42 @@ export class GolfCoursesComponent implements OnInit {
     return stats;
   }
 
-  get roundPlayerStats(): RoundPlayerStats[] {
-    const pars = this.selectedConfig?.pars;
-    if (!pars) {
-      return [];
-    }
+  get totalHoleStats(): HoleStats {
+    const holes = this.holeStats;
+    return {
+      number: 0,
+      par: null,
+      recorded: holes.reduce((total, hole) => total + hole.recorded, 0),
+      strokes: holes.reduce((total, hole) => total + hole.strokes, 0),
+      eagles: holes.reduce((total, hole) => total + hole.eagles, 0),
+      holeInOnes: holes.reduce((total, hole) => total + hole.holeInOnes, 0),
+      birdies: holes.reduce((total, hole) => total + hole.birdies, 0),
+      pars: holes.reduce((total, hole) => total + hole.pars, 0),
+      bogeys: holes.reduce((total, hole) => total + hole.bogeys, 0),
+      doubleBogeys: holes.reduce((total, hole) => total + hole.doubleBogeys, 0),
+      tripleBogeys: holes.reduce((total, hole) => total + hole.tripleBogeys, 0),
+      worse: holes.reduce((total, hole) => total + hole.worse, 0)
+    };
+  }
 
+  get roundPlayerStats(): RoundPlayerStats[] {
     return this.selectedCourseRounds.flatMap((round) =>
       this.roundPlayers(round)
         .filter((player) => this.matchesSelectedPlayer(player.name))
         .map((player) => {
+          const pars = this.courseConfigs.find((course) => course.name === round.course)?.pars;
+          if (!pars) {
+            return {
+              date: round.date,
+              course: round.course,
+              player: player.name,
+              score: player.holes.some((strokes) => strokes !== null)
+                ? player.holes.reduce<number>((total, strokes) => total + (strokes ?? 0), 0)
+                : null,
+              par: null
+            };
+          }
+
           let score = 0;
           let par = 0;
           let recorded = 0;
@@ -357,6 +490,7 @@ export class GolfCoursesComponent implements OnInit {
 
           return {
             date: round.date,
+            course: round.course,
             player: player.name,
             score: recorded > 0 ? score : null,
             par: recorded > 0 && allRecordedHolesHavePars ? par : null
@@ -379,7 +513,7 @@ export class GolfCoursesComponent implements OnInit {
       const requestedCourse = this.route.snapshot.queryParamMap.get('course');
       this.selectedCourse = this.courses.find(
         (course) => course.toLocaleLowerCase() === requestedCourse?.toLocaleLowerCase()
-      ) ?? this.courses[0] ?? '';
+      ) ?? this.allCoursesValue;
       this.selectCourse(this.selectedCourse);
       this.canManage = session !== null && await this.golfLog.isAdmin();
     } catch (error) {
@@ -393,9 +527,83 @@ export class GolfCoursesComponent implements OnInit {
   selectCourse(course: string): void {
     this.selectedCourse = course;
     this.selectedPlayer = '';
-    this.configCourseName = course;
+    this.configCourseName = course === this.allCoursesValue ? '' : course;
     const config = this.courseConfigs.find((item) => item.name === course);
     this.parsInput = config?.pars.join(', ') ?? '';
+    this.backgroundImageOpacity = config?.backgroundImageOpacity ?? 0.12;
+    this.selectedBackgroundFile = null;
+  }
+
+  selectBackgroundImage(event: Event): void {
+    const input = event.target;
+    if (!(input instanceof HTMLInputElement)) {
+      return;
+    }
+
+    const file = input.files?.[0] ?? null;
+    input.value = '';
+    this.saveError = '';
+    if (!file) {
+      return;
+    }
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      this.saveError = 'Choose a JPEG, PNG, or WebP image.';
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      this.saveError = 'Course images must be 5 MB or smaller.';
+      return;
+    }
+    this.selectedBackgroundFile = file;
+  }
+
+  async uploadBackgroundImage(): Promise<void> {
+    if (!this.selectedConfig || !this.selectedBackgroundFile || this.allCoursesSelected) {
+      this.saveError = 'Save this course configuration before uploading its image.';
+      return;
+    }
+
+    this.saving = true;
+    this.saveError = '';
+    this.notice = '';
+    try {
+      await this.golfLog.uploadCourseBackground(
+        this.selectedCourse,
+        this.selectedBackgroundFile,
+        Number(this.backgroundImageOpacity)
+      );
+      this.courseConfigs = await this.golfLog.getCourseConfigs();
+      this.selectedBackgroundFile = null;
+      this.notice = `Scorecard watermark uploaded for ${this.selectedCourse}.`;
+    } catch (error) {
+      console.error('Unable to upload course background image.', error);
+      this.saveError = this.describeError(error);
+    } finally {
+      this.saving = false;
+    }
+  }
+
+  async saveBackgroundOpacity(): Promise<void> {
+    if (!this.selectedConfig || this.allCoursesSelected) {
+      return;
+    }
+
+    this.saving = true;
+    this.saveError = '';
+    this.notice = '';
+    try {
+      await this.golfLog.updateCourseBackgroundOpacity(
+        this.selectedCourse,
+        Number(this.backgroundImageOpacity)
+      );
+      this.courseConfigs = await this.golfLog.getCourseConfigs();
+      this.notice = `Watermark opacity saved for ${this.selectedCourse}.`;
+    } catch (error) {
+      console.error('Unable to save course image opacity.', error);
+      this.saveError = this.describeError(error);
+    } finally {
+      this.saving = false;
+    }
   }
 
   async saveConfiguration(): Promise<void> {

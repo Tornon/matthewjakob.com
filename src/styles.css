@@ -395,13 +395,28 @@ a.course-setup-badge:focus-visible {
 }
 
 .round-card {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
   padding: 24px;
   border: 1px solid #334155;
   border-radius: 12px;
   background: #1e293b;
 }
 
+.round-card-watermark {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+}
+
 .round-heading {
+  position: relative;
+  z-index: 1;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -468,6 +483,8 @@ a.course-setup-badge:focus-visible {
 }
 
 .round-card details {
+  position: relative;
+  z-index: 1;
   border-top: 1px solid #334155;
   padding-top: 16px;
 }
@@ -478,12 +495,15 @@ a.course-setup-badge:focus-visible {
 }
 
 .scorecard-scroll {
+  position: relative;
+  z-index: 1;
   overflow-x: auto;
   margin-top: 16px;
 }
 
 .scorecard {
   width: 100%;
+  table-layout: fixed;
   border-collapse: collapse;
   text-align: center;
   white-space: nowrap;
@@ -501,13 +521,22 @@ a.course-setup-badge:focus-visible {
 
 .scorecard th,
 .scorecard td {
-  min-width: 40px;
-  padding: 10px 8px;
+  min-width: 0;
+  padding: 8px 2px;
   border-bottom: 1px solid #334155;
 }
 
 .scorecard th:first-child {
+  width: 110px;
   text-align: left;
+}
+
+.scorecard .scorecard-subtotal {
+  width: 58px;
+}
+
+.scorecard .scorecard-total {
+  width: 54px;
 }
 
 .scorecard .scorecard-subtotal {
@@ -556,8 +585,8 @@ a.course-setup-badge:focus-visible {
   position: relative;
   z-index: 0;
   display: inline-flex;
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
   align-items: center;
   justify-content: center;
   border-radius: 50%;
@@ -647,6 +676,17 @@ a.course-setup-badge:focus-visible {
   min-width: 72px;
 }
 
+.stats-table .stats-total-row {
+  background: #0c4a6e;
+  color: #e0f2fe;
+  font-weight: 800;
+}
+
+.stats-table .stats-total-row th,
+.stats-table .stats-total-row td {
+  border-top: 2px solid #38bdf8;
+}
+
 .course-config-form {
   max-width: 720px;
   margin-top: 40px;
@@ -654,6 +694,42 @@ a.course-setup-badge:focus-visible {
 
 .course-config-form h2 {
   font-size: 1.4rem;
+}
+
+.course-image-settings {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid #475569;
+  border-radius: 9px;
+  background: #0f172a;
+}
+
+.course-image-settings h3 {
+  font-size: 1.05rem;
+}
+
+.course-image-settings label {
+  display: grid;
+  gap: 8px;
+  color: #cbd5e1;
+  font-size: .95rem;
+}
+
+.course-image-settings input[type="range"] {
+  height: 24px;
+  padding: 0;
+  accent-color: #38bdf8;
+  cursor: pointer;
+}
+
+.course-image-preview {
+  width: min(100%, 420px);
+  height: 160px;
+  border: 1px solid #475569;
+  border-radius: 8px;
+  background: #1e293b;
+  object-fit: cover;
 }
 
 .course-config-access {
@@ -674,6 +750,7 @@ a.course-setup-badge:focus-visible {
   .round-card .scorecard {
     width: max-content;
     min-width: 100%;
+    table-layout: auto;
     font-size: .8rem;
   }
 
@@ -684,7 +761,13 @@ a.course-setup-badge:focus-visible {
   }
 
   .round-card .scorecard th:first-child {
+    width: auto;
     min-width: 68px;
+  }
+
+  .round-card .scorecard .scorecard-subtotal,
+  .round-card .scorecard .scorecard-total {
+    width: auto;
   }
 
   .round-card .scorecard .score-marker {

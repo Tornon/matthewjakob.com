@@ -67,7 +67,10 @@ create table public.golf_log_admins (
 
 create table public.golf_courses (
   name text primary key check (length(trim(name)) between 1 and 160),
-  pars integer[] not null check (public.valid_golf_course_pars(pars))
+  pars integer[] not null check (public.valid_golf_course_pars(pars)),
+  background_image_path text,
+  background_image_opacity real not null default 0.12
+    check (background_image_opacity between 0.03 and 0.5)
 );
 
 create table public.golf_rounds (
@@ -134,6 +137,44 @@ create policy "Golf log admins can edit courses"
   to authenticated
   using ((select public.is_golf_log_admin()))
   with check ((select public.is_golf_log_admin()));
+
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values (
+  'golf-course-images',
+  'golf-course-images',
+  true,
+  5242880,
+  array['image/jpeg', 'image/png', 'image/webp']
+)
+on conflict (id) do update
+set public = excluded.public,
+    file_size_limit = excluded.file_size_limit,
+    allowed_mime_types = excluded.allowed_mime_types;
+
+create policy "Golf course images are publicly readable"
+  on storage.objects
+  for select
+  to anon, authenticated
+  using (bucket_id = 'golf-course-images');
+
+create policy "Golf log admins can upload course images"
+  on storage.objects
+  for insert
+  to authenticated
+  with check (bucket_id = 'golf-course-images' and (select public.is_golf_log_admin()));
+
+create policy "Golf log admins can update course images"
+  on storage.objects
+  for update
+  to authenticated
+  using (bucket_id = 'golf-course-images' and (select public.is_golf_log_admin()))
+  with check (bucket_id = 'golf-course-images' and (select public.is_golf_log_admin()));
+
+create policy "Golf log admins can delete course images"
+  on storage.objects
+  for delete
+  to authenticated
+  using (bucket_id = 'golf-course-images' and (select public.is_golf_log_admin()));
 
 create policy "Golf rounds are publicly readable"
   on public.golf_rounds
