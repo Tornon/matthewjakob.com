@@ -112,8 +112,15 @@ import {
                           <th scope="col">Player</th>
                           @for (hole of round.holes; track $index) {
                             <th scope="col">{{ scorecardHoleNumber(round, $index) }}</th>
+                            @if (round.holes.length === 18 && $index === 8) {
+                              <th scope="col" class="scorecard-subtotal">Front 9</th>
+                            }
                           }
-                          <th scope="col">Total</th>
+                          @if (round.holes.length === 9) {
+                            <th scope="col" class="scorecard-subtotal">Front 9</th>
+                          }
+                          <th scope="col" class="scorecard-subtotal">Back 9</th>
+                          <th scope="col" class="scorecard-total">Total</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -121,8 +128,15 @@ import {
                           <th scope="row">Par</th>
                           @for (hole of round.holes; track $index) {
                             <td>{{ parForHole(round, $index) ?? '-' }}</td>
+                            @if (round.holes.length === 18 && $index === 8) {
+                              <td class="scorecard-subtotal">{{ segmentPar(round, 1) ?? '-' }}</td>
+                            }
                           }
-                          <td>-</td>
+                          @if (round.holes.length === 9) {
+                            <td class="scorecard-subtotal">{{ segmentPar(round, 1) ?? '-' }}</td>
+                          }
+                          <td class="scorecard-subtotal">{{ segmentPar(round, 10) ?? '-' }}</td>
+                          <td class="scorecard-total">{{ totalPar(round) ?? '-' }}</td>
                         </tr>
                         <tr>
                           <th scope="row">{{ round.playerName }}</th>
@@ -140,8 +154,21 @@ import {
                                 >{{ strokes }}</span>
                               }
                             </td>
+                            @if (round.holes.length === 18 && $index === 8) {
+                              <td class="scorecard-subtotal">
+                                {{ segmentStrokes(round, round.holes, 1) ?? '-' }}@if (segmentHasUnrecordedHoles(round, round.holes, 1)) { * }
+                              </td>
+                            }
                           }
-                          <td>{{ round.score }}</td>
+                          @if (round.holes.length === 9) {
+                            <td class="scorecard-subtotal">
+                              {{ segmentStrokes(round, round.holes, 1) ?? '-' }}@if (segmentHasUnrecordedHoles(round, round.holes, 1)) { * }
+                            </td>
+                          }
+                          <td class="scorecard-subtotal">
+                            {{ segmentStrokes(round, round.holes, 10) ?? '-' }}@if (segmentHasUnrecordedHoles(round, round.holes, 10)) { * }
+                          </td>
+                          <td class="scorecard-total">{{ round.score }}</td>
                         </tr>
                         @for (friend of round.friends; track $index) {
                           <tr>
@@ -160,8 +187,21 @@ import {
                                   >{{ strokes }}</span>
                                 }
                               </td>
+                              @if (round.holes.length === 18 && $index === 8) {
+                                <td class="scorecard-subtotal">
+                                  {{ segmentStrokes(round, friend.holes, 1) ?? '-' }}@if (segmentHasUnrecordedHoles(round, friend.holes, 1)) { * }
+                                </td>
+                              }
                             }
-                            <td>
+                            @if (round.holes.length === 9) {
+                              <td class="scorecard-subtotal">
+                                {{ segmentStrokes(round, friend.holes, 1) ?? '-' }}@if (segmentHasUnrecordedHoles(round, friend.holes, 1)) { * }
+                              </td>
+                            }
+                            <td class="scorecard-subtotal">
+                              {{ segmentStrokes(round, friend.holes, 10) ?? '-' }}@if (segmentHasUnrecordedHoles(round, friend.holes, 10)) { * }
+                            </td>
+                            <td class="scorecard-total">
                               {{ recordedStrokes(friend.holes) }}@if (hasUnrecordedHoles(friend.holes)) { * }
                             </td>
                           </tr>
@@ -169,8 +209,8 @@ import {
                       </tbody>
                     </table>
                   </div>
-                  @if (hasFriendWithUnrecordedHoles(round)) {
-                    <p class="scorecard-note">* Friend totals include recorded holes only.</p>
+                  @if (hasUnrecordedSegmentScores(round)) {
+                    <p class="scorecard-note">* Nine-hole subtotals include recorded holes only.</p>
                   }
                 </details>
               </li>
@@ -337,6 +377,7 @@ export class GolfLogComponent implements OnInit, OnDestroy {
   session: Session | null = null;
   canManage = false;
   editRoundId: string | null = null;
+  readonly scoreSegments: (1 | 10)[] = [1, 10];
 
   private unsubscribeAuth?: () => void;
 
@@ -573,6 +614,71 @@ export class GolfLogComponent implements OnInit, OnDestroy {
       index
     );
     return parIndex === null ? null : course.pars[parIndex];
+  }
+
+  totalPar(round: GolfRound): number | null {
+    const pars = round.holes.map((_, index) => this.parForHole(round, index));
+    return pars.length > 0 && pars.every((par) => par !== null)
+      ? pars.reduce<number>((total, par) => total + (par ?? 0), 0)
+      : null;
+  }
+
+  segmentPar(round: GolfRound, startingHole: 1 | 10): number | null {
+    if (round.holes.length === 9 && round.startingHole !== startingHole) {
+      return null;
+    }
+
+    const indexes = round.holes.length === 9
+      ? round.holes.map((_, index) => index)
+      : round.holes.map((_, index) => index)
+        .filter((index) => index >= startingHole - 1 && index < startingHole + 8);
+    const pars = indexes.map((index) => this.parForHole(round, index));
+    return pars.length === 9 && pars.every((par) => par !== null)
+      ? pars.reduce<number>((total, par) => total + (par ?? 0), 0)
+      : null;
+  }
+
+  segmentStrokes(
+    round: GolfRound,
+    holes: (number | null)[],
+    startingHole: 1 | 10
+  ): number | null {
+    if (holes.length === 9 && round.startingHole !== startingHole) {
+      return null;
+    }
+
+    const segment = holes.length === 9
+      ? holes
+      : holes.slice(startingHole - 1, startingHole + 8);
+    return segment.some((strokes) => strokes !== null)
+      ? segment.reduce<number>((total, strokes) => total + (strokes ?? 0), 0)
+      : null;
+  }
+
+  segmentHasUnrecordedHoles(
+    round: GolfRound,
+    holes: (number | null)[],
+    startingHole: 1 | 10
+  ): boolean {
+    if (holes.length === 9 && round.startingHole !== startingHole) {
+      return false;
+    }
+
+    const segment = holes.length === 9
+      ? holes
+      : holes.slice(startingHole - 1, startingHole + 8);
+    return segment.some((strokes) => strokes === null);
+  }
+
+  hasUnrecordedSegmentScores(round: GolfRound): boolean {
+    return [
+      round.holes,
+      ...round.friends.map((friend) => friend.holes)
+    ].some((holes) =>
+      this.scoreSegments.some((segment) =>
+        this.segmentHasUnrecordedHoles(round, holes, segment)
+      )
+    );
   }
 
   scoreMarker(
