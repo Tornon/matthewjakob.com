@@ -1,6 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import {
   courseHoleIndex,
   GolfLogService,
@@ -54,7 +54,9 @@ interface RoundPlayerStats {
             Course
             <select name="selectedCourse" [ngModel]="selectedCourse" (ngModelChange)="selectCourse($event)">
               @for (course of courses; track course) {
-                <option [value]="course">{{ course }}</option>
+                <option [value]="course">
+                  {{ course }}{{ isCourseConfigured(course) ? '' : ' — Setup needed' }}
+                </option>
               }
             </select>
           </label>
@@ -64,7 +66,13 @@ interface RoundPlayerStats {
           <section class="course-details" aria-labelledby="course-heading">
             <h2 id="course-heading">{{ selectedCourse }}</h2>
             @if (!selectedConfig) {
-              <p class="form-help">This course does not have hole pars configured yet.</p>
+              <div class="course-setup-notice">
+                <span class="course-setup-badge">Par setup needed</span>
+                <p>Hole-by-hole stats are unavailable until this course's pars are configured.</p>
+                @if (canManage) {
+                  <a href="#course-configuration">Configure this course <span aria-hidden="true">↓</span></a>
+                }
+              </div>
             } @else {
               <label class="course-filter">
                 Player stats
@@ -158,7 +166,7 @@ interface RoundPlayerStats {
       }
 
       @if (canManage) {
-        <form class="admin-form course-config-form" (ngSubmit)="saveConfiguration()">
+        <form id="course-configuration" class="admin-form course-config-form" (ngSubmit)="saveConfiguration()">
           <h2>Course configuration</h2>
           <div class="form-grid">
             <label>
@@ -219,7 +227,10 @@ export class GolfCoursesComponent implements OnInit {
   configCourseName = '';
   parsInput = '';
 
-  constructor(private readonly golfLog: GolfLogService) {}
+  constructor(
+    private readonly golfLog: GolfLogService,
+    private readonly route: ActivatedRoute
+  ) {}
 
   get courses(): string[] {
     return [...new Set([
@@ -230,6 +241,12 @@ export class GolfCoursesComponent implements OnInit {
 
   get selectedConfig(): GolfCourse | undefined {
     return this.courseConfigs.find((course) => course.name === this.selectedCourse);
+  }
+
+  isCourseConfigured(courseName: string): boolean {
+    return this.courseConfigs.some((course) =>
+      course.name.toLocaleLowerCase() === courseName.toLocaleLowerCase()
+    );
   }
 
   get selectedCourseRounds(): GolfRound[] {
@@ -359,7 +376,10 @@ export class GolfCoursesComponent implements OnInit {
       ]);
       this.rounds = rounds;
       this.courseConfigs = courseConfigs;
-      this.selectedCourse = this.courses[0] ?? '';
+      const requestedCourse = this.route.snapshot.queryParamMap.get('course');
+      this.selectedCourse = this.courses.find(
+        (course) => course.toLocaleLowerCase() === requestedCourse?.toLocaleLowerCase()
+      ) ?? this.courses[0] ?? '';
       this.selectCourse(this.selectedCourse);
       this.canManage = session !== null && await this.golfLog.isAdmin();
     } catch (error) {

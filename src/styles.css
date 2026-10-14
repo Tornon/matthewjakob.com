@@ -136,6 +136,48 @@ body {
   box-shadow: 0 6px 18px #0284c755;
 }
 
+.course-setup-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 8px;
+  padding: 4px 9px;
+  border: 1px solid #f59e0b88;
+  border-radius: 999px;
+  background: #78350f66;
+  color: #fcd34d;
+  font-size: .78rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+a.course-setup-badge:hover,
+a.course-setup-badge:focus-visible {
+  border-color: #fbbf24;
+  background: #78350f;
+  text-decoration: underline;
+}
+
+.course-setup-notice {
+  display: grid;
+  justify-items: start;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid #92400e;
+  border-radius: 9px;
+  background: #451a03;
+  color: #fde68a;
+}
+
+.course-setup-notice p {
+  color: #fcd34d;
+}
+
+.course-setup-notice a {
+  color: #bae6fd;
+  font-weight: 700;
+}
+
 .empty-state {
   max-width: 650px;
   padding: 28px;
@@ -458,6 +500,30 @@ body {
   font-family: "Trebuchet MS", "Segoe UI", sans-serif;
   font-size: 1rem;
   font-weight: 800;
+}
+
+.scorecard .par-row .par-front-total {
+  border-left: 2px solid #22d3ee;
+  background: #164e63;
+  color: #cffafe;
+  font-size: 1rem;
+  font-style: italic;
+}
+
+.scorecard .par-row .par-back-total {
+  border-left: 2px solid #a78bfa;
+  background: #3b2f63;
+  color: #ede9fe;
+  font-size: 1rem;
+  font-style: italic;
+}
+
+.scorecard .par-row .par-round-total {
+  border-left: 2px solid #fbbf24;
+  background: #713f12;
+  color: #fef3c7;
+  font-size: 1.05rem;
+  font-style: italic;
 }
 
 .scorecard .score-marker {

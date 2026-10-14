@@ -63,7 +63,10 @@ import {
           <select name="courseFilter" [(ngModel)]="selectedCourse">
             <option value="">All courses ({{ roundsMatchingPlayers.length }})</option>
             @for (courseName of courses; track courseName) {
-              <option [value]="courseName">{{ courseName }} ({{ countRoundsAt(courseName) }})</option>
+              <option [value]="courseName">
+                {{ courseName }}{{ isCourseConfigured(courseName) ? '' : ' — Setup needed' }}
+                ({{ countRoundsAt(courseName) }})
+              </option>
             }
           </select>
         </label>
@@ -78,6 +81,14 @@ import {
                   <div>
                     <h2>{{ roundTitle(round) }}</h2>
                     <time [attr.datetime]="round.date">{{ formatDate(round.date) }}</time>
+                    @if (!isCourseConfigured(round.course)) {
+                      <a
+                        class="course-setup-badge"
+                        routerLink="/golf-courses"
+                        [queryParams]="{ course: round.course }"
+                        [attr.aria-label]="'Configure pars for ' + round.course"
+                      >Par setup needed <span aria-hidden="true">→</span></a>
+                    }
                   </div>
                   <div class="round-result">
                     <p class="round-score"><strong>{{ round.score }}</strong><span>strokes</span></p>
@@ -129,14 +140,14 @@ import {
                           @for (hole of round.holes; track $index) {
                             <td>{{ parForHole(round, $index) ?? '-' }}</td>
                             @if (round.holes.length === 18 && $index === 8) {
-                              <td class="scorecard-subtotal">{{ segmentPar(round, 1) ?? '-' }}</td>
+                              <td class="scorecard-subtotal par-front-total">{{ segmentPar(round, 1) ?? '-' }}</td>
                             }
                           }
                           @if (round.holes.length === 9) {
-                            <td class="scorecard-subtotal">{{ segmentPar(round, 1) ?? '-' }}</td>
+                            <td class="scorecard-subtotal par-front-total">{{ segmentPar(round, 1) ?? '-' }}</td>
                           }
-                          <td class="scorecard-subtotal">{{ segmentPar(round, 10) ?? '-' }}</td>
-                          <td class="scorecard-total">{{ totalPar(round) ?? '-' }}</td>
+                          <td class="scorecard-subtotal par-back-total">{{ segmentPar(round, 10) ?? '-' }}</td>
+                          <td class="scorecard-total par-round-total">{{ totalPar(round) ?? '-' }}</td>
                         </tr>
                         <tr>
                           <th scope="row">{{ round.playerName }}</th>
@@ -571,6 +582,12 @@ export class GolfLogComponent implements OnInit, OnDestroy {
 
   countRoundsAt(courseName: string): number {
     return this.roundsMatchingPlayers.filter((round) => round.course === courseName).length;
+  }
+
+  isCourseConfigured(courseName: string): boolean {
+    return this.courseConfigs.some((course) =>
+      course.name.toLocaleLowerCase() === courseName.toLocaleLowerCase()
+    );
   }
 
   clearPlayerFilter(): void {
