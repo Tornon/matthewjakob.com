@@ -418,21 +418,47 @@ a.course-setup-badge:focus-visible {
   color: #94a3b8;
 }
 
-.round-score {
-  display: grid;
-  justify-items: end;
-  color: #94a3b8;
-}
-
-.round-score strong {
-  color: #38bdf8;
-  font-size: 1.75rem;
-}
-
 .round-result {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
+}
+
+.round-scores {
+  display: grid;
+  gap: 4px;
+  min-width: 140px;
+  color: #cbd5e1;
+  font-size: .85rem;
+}
+
+.round-scores-label {
+  color: #94a3b8;
+  font-size: .75rem;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-align: right;
+  text-transform: uppercase;
+}
+
+.round-scores ul {
+  display: grid;
+  gap: 3px;
+  list-style: none;
+}
+
+.round-scores li {
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.round-scores li strong {
+  min-width: 2.5ch;
+  color: #38bdf8;
+  font-size: 1.15rem;
+  text-align: right;
 }
 
 .form-actions {
@@ -716,6 +742,24 @@ a.course-setup-badge:focus-visible {
 
   .round-heading {
     align-items: flex-start;
+  }
+
+  .round-result {
+    align-items: flex-end;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .round-scores {
+    min-width: 0;
+  }
+
+  .round-scores-label {
+    text-align: left;
+  }
+
+  .round-scores li {
+    justify-content: flex-start;
   }
 
   .form-grid {

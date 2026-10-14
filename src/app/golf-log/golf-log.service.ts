@@ -53,6 +53,12 @@ export interface ParsedGolfImport {
   skippedWithoutScores: number;
 }
 
+export interface GolfImportResult {
+  added: number;
+  merged: number;
+  combined: number;
+}
+
 interface SupabaseConfig {
   url: string;
   anonKey: string;
@@ -373,39 +379,145 @@ export class GolfLogService {
     }
   }
 
-  async importRounds(rounds: ImportedGolfRound[]): Promise<number> {
-    const client = await this.getClient();
-    let inserted = 0;
+  async importRounds(rounds: ImportedGolfRound[]): Promise<GolfImportResult> {
+    const existing = await this.getRounds();
+    const groups = this.groupRounds([...existing, ...rounds]);
+    let added = 0;
+    let merged = 0;
+    let combined = 0;
 
-    for (let index = 0; index < rounds.length; index += 100) {
-      const batch = rounds.slice(index, index + 100);
-      const { data, error } = await client
-        .from('golf_rounds')
-        .upsert(
-          batch.map((round) => ({
-            played_on: round.date,
-            course: round.course.trim(),
-            starting_hole: round.startingHole ?? 1,
-            player_name: round.playerName?.trim() || 'You',
-            total_strokes: round.score,
-            hole_strokes: round.holes,
-            friend_scores: []
-          })),
-          {
-            onConflict: 'played_on,course,starting_hole,total_strokes,hole_strokes',
-            ignoreDuplicates: true
-          }
-        )
-        .select('id');
-
-      if (error) {
-        throw new Error(`Import stopped after ${inserted} rounds: ${error.message}`);
+    for (const group of groups) {
+      const groupExisting = group.filter(this.isStoredRound);
+      const groupImported = group.filter(this.isImportedRound);
+      if (groupImported.length === 0) {
+        continue;
       }
 
-      inserted += data.length;
+      try {
+        const mergedRound = this.mergeRoundCards(groupExisting, groupImported);
+        if (groupExisting.length === 0) {
+          await this.addRound(mergedRound);
+          added++;
+          continue;
+        }
+
+        await this.saveMergedRound(groupExisting, mergedRound);
+        merged++;
+        combined += Math.max(0, groupExisting.length - 1);
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : String(error);
+        throw new Error(
+          `Import stopped after adding ${added} rounds and merging ${merged} matching rounds. ${reason}`
+        );
+      }
     }
 
-    return inserted;
+    return { added, merged, combined };
+  }
+
+  private groupRounds(rounds: (GolfRound | ImportedGolfRound)[]): (GolfRound | ImportedGolfRound)[][] {
+    const groups = new Map<string, (GolfRound | ImportedGolfRound)[]>();
+    for (const round of rounds) {
+      const key = [
+        round.date,
+        round.course.trim().toLocaleLowerCase(),
+        round.startingHole ?? 1,
+        round.holes.length
+      ].join('|');
+      const group = groups.get(key) ?? [];
+      group.push(round);
+      groups.set(key, group);
+    }
+    return [...groups.values()];
+  }
+
+  private isStoredRound(round: GolfRound | ImportedGolfRound): round is GolfRound {
+    return 'id' in round;
+  }
+
+  private isImportedRound(round: GolfRound | ImportedGolfRound): round is ImportedGolfRound {
+    return !('id' in round);
+  }
+
+  private mergeRoundCards(
+    existing: GolfRound[],
+    incoming: ImportedGolfRound[]
+  ): ImportedGolfRound {
+    const cards = new Map<string, GolfFriendScore>();
+    const orderedExisting = [...existing].reverse();
+
+    for (const round of orderedExisting) {
+      cards.set(round.playerName.trim().toLocaleLowerCase(), {
+        name: round.playerName.trim(),
+        holes: round.holes
+      });
+      for (const friend of round.friends) {
+        cards.set(friend.name.trim().toLocaleLowerCase(), friend);
+      }
+    }
+    for (const round of incoming) {
+      cards.set((round.playerName?.trim() || 'You').toLocaleLowerCase(), {
+        name: round.playerName?.trim() || 'You',
+        holes: round.holes
+      });
+      for (const friend of round.friends ?? []) {
+        cards.set(friend.name.trim().toLocaleLowerCase(), friend);
+      }
+    }
+
+    const preferredPrimaryName = existing[0]?.playerName
+      ?? incoming[0]?.playerName?.trim()
+      ?? 'You';
+    const primaryKey = preferredPrimaryName.toLocaleLowerCase();
+    const primary = cards.get(primaryKey) ?? [...cards.values()][0];
+    if (!primary) {
+      throw new Error('Cannot merge a round without at least one player scorecard.');
+    }
+
+    const source = existing[0] ?? incoming[0];
+    if (!source) {
+      throw new Error('Cannot merge an empty round group.');
+    }
+
+    return {
+      date: source.date,
+      course: source.course,
+      startingHole: source.startingHole ?? 1,
+      playerName: primary.name,
+      score: primary.holes.reduce<number>((total, strokes) => total + (strokes ?? 0), 0),
+      holes: primary.holes,
+      friends: [...cards.entries()]
+        .filter(([name]) => name !== primaryKey)
+        .map(([, card]) => card)
+    };
+  }
+
+  private async saveMergedRound(
+    existing: GolfRound[],
+    mergedRound: ImportedGolfRound
+  ): Promise<void> {
+    const keeper = existing[0];
+    if (!keeper) {
+      throw new Error('Cannot save a merged round without an existing round.');
+    }
+
+    const stagedRound: ImportedGolfRound = {
+      ...mergedRound,
+      playerName: keeper.playerName,
+      score: keeper.score,
+      holes: keeper.holes,
+      startingHole: keeper.startingHole,
+      friends: (mergedRound.friends ?? []).filter(
+        (friend) => friend.name.trim().toLocaleLowerCase() !== keeper.playerName.trim().toLocaleLowerCase()
+      )
+    };
+    await this.updateRound(keeper.id, stagedRound);
+
+    for (const duplicate of existing.slice(1)) {
+      await this.deleteRound(duplicate.id);
+    }
+
+    await this.updateRound(keeper.id, mergedRound);
   }
 
   private async createConfiguredClient(): Promise<SupabaseClient> {

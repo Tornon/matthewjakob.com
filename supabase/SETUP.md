@@ -26,6 +26,6 @@ To add players, edit a round or create one and enter your scorecard on the first
 
 Open **Course configuration & stats** from the Golf Log to configure 9 or 18 hole pars for each course. Authorized admins can enter comma-separated pars (3–6). The page displays per-hole scoring averages and birdie/par/bogey counts, plus each player's score and score-to-par for every round. A nine-hole round can be marked as front or back nine; existing rounds and imported nine-hole rounds default to the front nine until edited.
 
-Exact duplicate imported rounds are skipped; if a bulk import fails part-way through, selecting the file again safely retries it.
+Imported scorecards for the same date and course are combined when their scorecard lengths and nine-hole segments match. If the same player is imported again for that round, the newly imported scorecard replaces their previous one. If an import fails part-way through, selecting the file again safely retries it.
 
 Supabase is the live source of truth; the generated JSON stays outside the website's deployed public assets and is only needed as an import file.

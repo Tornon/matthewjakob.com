@@ -91,7 +91,19 @@ import {
                     }
                   </div>
                   <div class="round-result">
-                    <p class="round-score"><strong>{{ round.score }}</strong><span>strokes</span></p>
+                    <div class="round-scores" aria-label="Player totals">
+                      <span class="round-scores-label">Total strokes</span>
+                      <ul>
+                        @for (playerTotal of playerTotals(round); track playerTotal.name) {
+                          <li>
+                            <span>{{ playerTotal.name }}</span>
+                            <strong>
+                              {{ playerTotal.score }}@if (playerTotal.partial) { * }
+                            </strong>
+                          </li>
+                        }
+                      </ul>
+                    </div>
                     @if (canManage) {
                       <button
                         type="button"
@@ -220,8 +232,8 @@ import {
                       </tbody>
                     </table>
                   </div>
-                  @if (hasUnrecordedSegmentScores(round)) {
-                    <p class="scorecard-note">* Nine-hole subtotals include recorded holes only.</p>
+                  @if (hasUnrecordedScorecards(round) || hasUnrecordedSegmentScores(round)) {
+                    <p class="scorecard-note">* Totals and nine-hole subtotals include recorded holes only.</p>
                   }
                 </details>
               </li>
@@ -559,11 +571,12 @@ export class GolfLogComponent implements OnInit, OnDestroy {
         );
       }
 
-      const inserted = await this.golfLog.importRounds(rounds);
+      const result = await this.golfLog.importRounds(rounds);
       this.notice =
-        `Imported ${inserted} new rounds. ` +
+        `Added ${result.added} new rounds and merged scorecards into ${result.merged} matching rounds. ` +
+        `${result.combined} duplicate round entries were combined. ` +
         `${skippedWithoutScores} rounds with no recorded hole scores were skipped; ` +
-        'exact duplicates were also skipped.';
+        'repeat player scorecards were updated from the import.';
       await this.refreshRounds();
     } catch (error) {
       console.error('Unable to import golf rounds.', error);
@@ -730,6 +743,27 @@ export class GolfLogComponent implements OnInit, OnDestroy {
 
   hasFriendWithUnrecordedHoles(round: GolfRound): boolean {
     return round.friends.some((friend) => this.friendHasUnrecordedHoles(friend));
+  }
+
+  hasUnrecordedScorecards(round: GolfRound): boolean {
+    return this.hasUnrecordedHoles(round.holes) || this.hasFriendWithUnrecordedHoles(round);
+  }
+
+  playerTotals(round: GolfRound): { name: string; score: number; partial: boolean }[] {
+    return [
+      {
+        name: round.playerName,
+        score: round.score,
+        partial: this.hasUnrecordedHoles(round.holes)
+      },
+      ...round.friends.map((friend) => ({
+        name: friend.name,
+        score: this.recordedStrokes(friend.holes),
+        partial: this.hasUnrecordedHoles(friend.holes)
+      }))
+    ].sort((left, right) =>
+      left.score - right.score || left.name.localeCompare(right.name)
+    );
   }
 
   private matchesSelectedPlayers(round: GolfRound): boolean {
