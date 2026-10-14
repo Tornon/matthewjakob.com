@@ -82,6 +82,7 @@ import {
                     class="round-card-watermark"
                     [src]="watermark.url"
                     [style.opacity]="watermark.opacity"
+                    [style.object-position]="watermark.positionX + '% ' + watermark.positionY + '%'"
                     alt=""
                     aria-hidden="true"
                   >
@@ -612,14 +613,18 @@ export class GolfLogComponent implements OnInit, OnDestroy {
     );
   }
 
-  courseWatermark(round: GolfRound): { url: string; opacity: number } | null {
+  courseWatermark(
+    round: GolfRound
+  ): { url: string; opacity: number; positionX: number; positionY: number } | null {
     const course = this.courseConfigs.find(
       (config) => config.name.toLocaleLowerCase() === round.course.toLocaleLowerCase()
     );
     return course?.backgroundImageUrl
       ? {
           url: course.backgroundImageUrl,
-          opacity: course.backgroundImageOpacity ?? 0.12
+          opacity: course.backgroundImageOpacity ?? 0.12,
+          positionX: course.backgroundImagePositionX ?? 50,
+          positionY: course.backgroundImagePositionY ?? 50
         }
       : null;
   }

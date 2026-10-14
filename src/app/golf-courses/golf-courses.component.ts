@@ -96,7 +96,7 @@ interface RoundPlayerStats {
                 <p class="log-status">No configured course pars are available for hole statistics.</p>
               } @else {
                 <div class="scorecard-scroll">
-                  <table class="scorecard stats-table">
+                  <table class="scorecard stats-table" [class.all-courses-hole-table]="allCoursesSelected">
                     <caption>{{ allCoursesSelected ? 'All courses' : selectedCourse }} hole statistics</caption>
                     <thead>
                       <tr>
@@ -152,7 +152,7 @@ interface RoundPlayerStats {
                 <p class="log-status">No recorded scores for this course and player selection.</p>
               } @else {
                 <div class="scorecard-scroll">
-                  <table class="scorecard stats-table">
+                  <table class="scorecard stats-table" [class.all-courses-round-table]="allCoursesSelected">
                     <caption>{{ allCoursesSelected ? 'All courses' : selectedCourse }} round results</caption>
                     <thead>
                       <tr>
@@ -232,12 +232,15 @@ interface RoundPlayerStats {
             <section class="course-image-settings" aria-labelledby="course-image-heading">
               <h3 id="course-image-heading">Scorecard watermark</h3>
               @if (selectedConfig.backgroundImageUrl) {
-                <img
-                  class="course-image-preview"
-                  [src]="selectedConfig.backgroundImageUrl"
-                  alt="Preview of the scorecard watermark for {{ selectedCourse }}"
-                  [style.opacity]="backgroundImageOpacity"
-                >
+                <div class="course-image-preview-frame">
+                  <img
+                    class="course-image-preview"
+                    [src]="selectedConfig.backgroundImageUrl"
+                    alt="Preview of the scorecard watermark for {{ selectedCourse }}"
+                    [style.opacity]="backgroundImageOpacity"
+                    [style.object-position]="backgroundImagePositionX + '% ' + backgroundImagePositionY + '%'"
+                  >
+                </div>
                 <label>
                   Watermark opacity: {{ (backgroundImageOpacity * 100).toFixed(0) }}%
                   <input
@@ -249,12 +252,34 @@ interface RoundPlayerStats {
                     [(ngModel)]="backgroundImageOpacity"
                   >
                 </label>
+                <label>
+                  Horizontal image position: {{ backgroundImagePositionX }}%
+                  <input
+                    name="backgroundImagePositionX"
+                    type="range"
+                    min="0"
+                    max="100"
+                    step="1"
+                    [(ngModel)]="backgroundImagePositionX"
+                  >
+                </label>
+                <label>
+                  Vertical image position: {{ backgroundImagePositionY }}%
+                  <input
+                    name="backgroundImagePositionY"
+                    type="range"
+                    min="0"
+                    max="100"
+                    step="1"
+                    [(ngModel)]="backgroundImagePositionY"
+                  >
+                </label>
                 <button
                   type="button"
                   class="secondary-button"
                   [disabled]="saving"
-                  (click)="saveBackgroundOpacity()"
-                >Save opacity</button>
+                  (click)="saveWatermarkSettings()"
+                >Save watermark settings</button>
               } @else {
                 <p class="form-help">Upload an image to show as a faint watermark behind this course's scorecards.</p>
               }
@@ -313,6 +338,8 @@ export class GolfCoursesComponent implements OnInit {
   configCourseName = '';
   parsInput = '';
   backgroundImageOpacity = 0.12;
+  backgroundImagePositionX = 50;
+  backgroundImagePositionY = 50;
   selectedBackgroundFile: File | null = null;
 
   constructor(
@@ -531,6 +558,8 @@ export class GolfCoursesComponent implements OnInit {
     const config = this.courseConfigs.find((item) => item.name === course);
     this.parsInput = config?.pars.join(', ') ?? '';
     this.backgroundImageOpacity = config?.backgroundImageOpacity ?? 0.12;
+    this.backgroundImagePositionX = config?.backgroundImagePositionX ?? 50;
+    this.backgroundImagePositionY = config?.backgroundImagePositionY ?? 50;
     this.selectedBackgroundFile = null;
   }
 
@@ -570,7 +599,9 @@ export class GolfCoursesComponent implements OnInit {
       await this.golfLog.uploadCourseBackground(
         this.selectedCourse,
         this.selectedBackgroundFile,
-        Number(this.backgroundImageOpacity)
+        Number(this.backgroundImageOpacity),
+        Number(this.backgroundImagePositionX),
+        Number(this.backgroundImagePositionY)
       );
       this.courseConfigs = await this.golfLog.getCourseConfigs();
       this.selectedBackgroundFile = null;
@@ -583,7 +614,7 @@ export class GolfCoursesComponent implements OnInit {
     }
   }
 
-  async saveBackgroundOpacity(): Promise<void> {
+  async saveWatermarkSettings(): Promise<void> {
     if (!this.selectedConfig || this.allCoursesSelected) {
       return;
     }
@@ -592,14 +623,19 @@ export class GolfCoursesComponent implements OnInit {
     this.saveError = '';
     this.notice = '';
     try {
-      await this.golfLog.updateCourseBackgroundOpacity(
+      const savedSettings = await this.golfLog.updateCourseWatermarkSettings(
         this.selectedCourse,
-        Number(this.backgroundImageOpacity)
+        Number(this.backgroundImageOpacity),
+        Number(this.backgroundImagePositionX),
+        Number(this.backgroundImagePositionY)
       );
+      this.backgroundImageOpacity = savedSettings.opacity;
+      this.backgroundImagePositionX = savedSettings.positionX;
+      this.backgroundImagePositionY = savedSettings.positionY;
       this.courseConfigs = await this.golfLog.getCourseConfigs();
-      this.notice = `Watermark opacity saved for ${this.selectedCourse}.`;
+      this.notice = `Watermark settings saved for ${this.selectedCourse}.`;
     } catch (error) {
-      console.error('Unable to save course image opacity.', error);
+      console.error('Unable to save course watermark settings.', error);
       this.saveError = this.describeError(error);
     } finally {
       this.saving = false;

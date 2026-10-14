@@ -33,6 +33,8 @@ export interface GolfCourse {
   pars: number[];
   backgroundImagePath?: string | null;
   backgroundImageOpacity?: number;
+  backgroundImagePositionX?: number;
+  backgroundImagePositionY?: number;
   backgroundImageUrl?: string | null;
 }
 
@@ -311,7 +313,9 @@ export class GolfLogService {
   async getCourseConfigs(): Promise<GolfCourse[]> {
     const { data, error } = await (await this.getClient())
       .from('golf_courses')
-      .select('name, pars, background_image_path, background_image_opacity')
+      .select(
+        'name, pars, background_image_path, background_image_opacity, background_image_position_x, background_image_position_y'
+      )
       .order('name', { ascending: true });
 
     if (error) {
@@ -324,6 +328,8 @@ export class GolfLogService {
       pars: course.pars,
       backgroundImagePath: course.background_image_path,
       backgroundImageOpacity: course.background_image_opacity,
+      backgroundImagePositionX: course.background_image_position_x,
+      backgroundImagePositionY: course.background_image_position_y,
       backgroundImageUrl: course.background_image_path
         ? client.storage.from('golf-course-images').getPublicUrl(course.background_image_path).data.publicUrl
         : null
@@ -340,7 +346,13 @@ export class GolfLogService {
     }
   }
 
-  async uploadCourseBackground(name: string, file: File, opacity: number): Promise<void> {
+  async uploadCourseBackground(
+    name: string,
+    file: File,
+    opacity: number,
+    positionX: number,
+    positionY: number
+  ): Promise<void> {
     const client = await this.getClient();
     const extension = file.type === 'image/jpeg' ? 'jpg' : file.type.slice('image/'.length);
     const path = `${crypto.randomUUID()}.${extension}`;
@@ -356,7 +368,9 @@ export class GolfLogService {
       .from('golf_courses')
       .update({
         background_image_path: path,
-        background_image_opacity: opacity
+        background_image_opacity: opacity,
+        background_image_position_x: positionX,
+        background_image_position_y: positionY
       })
       .eq('name', name.trim())
       .select('background_image_path')
@@ -375,12 +389,21 @@ export class GolfLogService {
     }
   }
 
-  async updateCourseBackgroundOpacity(name: string, opacity: number): Promise<void> {
+  async updateCourseWatermarkSettings(
+    name: string,
+    opacity: number,
+    positionX: number,
+    positionY: number
+  ): Promise<{ opacity: number; positionX: number; positionY: number }> {
     const { data, error } = await (await this.getClient())
       .from('golf_courses')
-      .update({ background_image_opacity: opacity })
+      .update({
+        background_image_opacity: opacity,
+        background_image_position_x: positionX,
+        background_image_position_y: positionY
+      })
       .eq('name', name.trim())
-      .select('name')
+      .select('background_image_opacity, background_image_position_x, background_image_position_y')
       .maybeSingle();
 
     if (error) {
@@ -389,6 +412,12 @@ export class GolfLogService {
     if (!data) {
       throw new Error('Course configuration was not found. Save its pars before changing image opacity.');
     }
+
+    return {
+      opacity: data.background_image_opacity,
+      positionX: data.background_image_position_x,
+      positionY: data.background_image_position_y
+    };
   }
 
   async addRound(round: ImportedGolfRound): Promise<void> {

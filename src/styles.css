@@ -411,6 +411,7 @@ a.course-setup-badge:focus-visible {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  object-position: center;
   pointer-events: none;
 }
 
@@ -503,10 +504,13 @@ a.course-setup-badge:focus-visible {
 
 .scorecard {
   width: 100%;
-  table-layout: fixed;
   border-collapse: collapse;
   text-align: center;
   white-space: nowrap;
+}
+
+.round-card .scorecard {
+  table-layout: fixed;
 }
 
 .scorecard caption {
@@ -526,16 +530,16 @@ a.course-setup-badge:focus-visible {
   border-bottom: 1px solid #334155;
 }
 
-.scorecard th:first-child {
+.round-card .scorecard th:first-child {
   width: 110px;
   text-align: left;
 }
 
-.scorecard .scorecard-subtotal {
+.round-card .scorecard .scorecard-subtotal {
   width: 58px;
 }
 
-.scorecard .scorecard-total {
+.round-card .scorecard .scorecard-total {
   width: 54px;
 }
 
@@ -676,6 +680,57 @@ a.course-setup-badge:focus-visible {
   min-width: 72px;
 }
 
+.stats-table.all-courses-hole-table {
+  table-layout: fixed;
+}
+
+.stats-table.all-courses-hole-table th,
+.stats-table.all-courses-hole-table td {
+  min-width: 0;
+  padding: 8px 4px;
+  white-space: normal;
+}
+
+.stats-table.all-courses-hole-table thead th {
+  font-size: .82rem;
+  line-height: 1.25;
+}
+
+.stats-table.all-courses-hole-table th:first-child {
+  width: 56px;
+}
+
+.stats-table.all-courses-round-table {
+  table-layout: fixed;
+  white-space: normal;
+}
+
+.stats-table.all-courses-round-table th,
+.stats-table.all-courses-round-table td {
+  min-width: 0;
+  padding: 8px 6px;
+  overflow-wrap: anywhere;
+}
+
+.stats-table.all-courses-round-table th:first-child {
+  width: 160px;
+}
+
+.stats-table.all-courses-round-table th:nth-child(2),
+.stats-table.all-courses-round-table td:nth-child(2) {
+  width: 210px;
+}
+
+.stats-table.all-courses-round-table th:nth-child(3),
+.stats-table.all-courses-round-table td:nth-child(3) {
+  width: 140px;
+}
+
+.stats-table.all-courses-round-table th:nth-child(n + 4),
+.stats-table.all-courses-round-table td:nth-child(n + 4) {
+  width: 90px;
+}
+
 .stats-table .stats-total-row {
   background: #0c4a6e;
   color: #e0f2fe;
@@ -723,12 +778,18 @@ a.course-setup-badge:focus-visible {
   cursor: pointer;
 }
 
-.course-image-preview {
+.course-image-preview-frame {
   width: min(100%, 420px);
   height: 160px;
+  overflow: hidden;
   border: 1px solid #475569;
   border-radius: 8px;
   background: #1e293b;
+}
+
+.course-image-preview {
+  width: 100%;
+  height: 100%;
   object-fit: cover;
 }
 

@@ -1,6 +1,8 @@
 alter table public.golf_courses
   add column if not exists background_image_path text,
-  add column if not exists background_image_opacity real not null default 0.12;
+  add column if not exists background_image_opacity real not null default 0.12,
+  add column if not exists background_image_position_x real not null default 50,
+  add column if not exists background_image_position_y real not null default 50;
 
 alter table public.golf_courses
   drop constraint if exists golf_courses_background_image_opacity_check;
@@ -8,6 +10,16 @@ alter table public.golf_courses
 alter table public.golf_courses
   add constraint golf_courses_background_image_opacity_check
   check (background_image_opacity between 0.03 and 0.5);
+
+alter table public.golf_courses
+  drop constraint if exists golf_courses_background_image_position_x_check,
+  drop constraint if exists golf_courses_background_image_position_y_check;
+
+alter table public.golf_courses
+  add constraint golf_courses_background_image_position_x_check
+    check (background_image_position_x between 0 and 100),
+  add constraint golf_courses_background_image_position_y_check
+    check (background_image_position_y between 0 and 100);
 
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values (

@@ -70,7 +70,11 @@ create table public.golf_courses (
   pars integer[] not null check (public.valid_golf_course_pars(pars)),
   background_image_path text,
   background_image_opacity real not null default 0.12
-    check (background_image_opacity between 0.03 and 0.5)
+    check (background_image_opacity between 0.03 and 0.5),
+  background_image_position_x real not null default 50
+    check (background_image_position_x between 0 and 100),
+  background_image_position_y real not null default 50
+    check (background_image_position_y between 0 and 100)
 );
 
 create table public.golf_rounds (
