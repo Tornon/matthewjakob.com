@@ -9,5 +9,11 @@ export const routes: Routes = [
       import('./golf-log/golf-log.component').then((module) => module.GolfLogComponent),
     title: 'Golf Log'
   },
+  {
+    path: 'golf-courses',
+    loadComponent: () =>
+      import('./golf-courses/golf-courses.component').then((module) => module.GolfCoursesComponent),
+    title: 'Course Details & Stats'
+  },
   { path: '**', redirectTo: '' }
 ];

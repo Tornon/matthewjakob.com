@@ -3,8 +3,10 @@ import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import type { Session } from '@supabase/supabase-js';
 import {
+  courseHoleIndex,
   GolfLogService,
   parseGolfImportData,
+  type GolfCourse,
   type GolfRound,
   type ImportedGolfRound
 } from './golf-log.service';
@@ -18,6 +20,9 @@ import {
       <a class="back-link" routerLink="/">&larr; Back to home</a>
       <h1>Golf Log</h1>
       <p class="intro">A place to keep track of rounds played with friends.</p>
+      <p class="course-details-link">
+        <a routerLink="/golf-courses">Course details &amp; stats</a>
+      </p>
 
       @if (loading) {
         <p class="log-status" role="status">Loading rounds...</p>
@@ -32,10 +37,31 @@ import {
         <p class="public-score-notice">
           Friend names and scores shown here are public.
         </p>
+        <fieldset class="player-filter">
+          <legend>Filter rounds by player(s)</legend>
+          <label>
+            <input
+              type="checkbox"
+              [checked]="selectedPlayers.length === 0"
+              (change)="clearPlayerFilter()"
+            >
+            All players
+          </label>
+          @for (player of players; track player) {
+            <label>
+              <input
+                type="checkbox"
+                [checked]="selectedPlayers.includes(player)"
+                (change)="togglePlayer(player, $event)"
+              >
+              {{ player }}
+            </label>
+          }
+        </fieldset>
         <label class="course-filter">
           Filter rounds by course
           <select name="courseFilter" [(ngModel)]="selectedCourse">
-            <option value="">All courses ({{ rounds.length }})</option>
+            <option value="">All courses ({{ roundsMatchingPlayers.length }})</option>
             @for (courseName of courses; track courseName) {
               <option [value]="courseName">{{ courseName }} ({{ countRoundsAt(courseName) }})</option>
             }
@@ -43,14 +69,14 @@ import {
         </label>
 
         @if (filteredRounds.length === 0) {
-          <p class="log-status">No rounds at this course yet.</p>
+          <p class="log-status">No rounds match these filters.</p>
         } @else {
           <ol class="round-list" aria-label="Golf rounds">
             @for (round of filteredRounds; track round.id) {
               <li class="round-card">
                 <div class="round-heading">
                   <div>
-                    <h2>{{ round.course }}</h2>
+                    <h2>{{ roundTitle(round) }}</h2>
                     <time [attr.datetime]="round.date">{{ formatDate(round.date) }}</time>
                   </div>
                   <div class="round-result">
@@ -64,6 +90,14 @@ import {
                       >
                         Edit
                       </button>
+                      <button
+                        type="button"
+                        class="danger-button"
+                        [disabled]="busy"
+                        (click)="deleteRound(round)"
+                      >
+                        Delete
+                      </button>
                     }
                   </div>
                 </div>
@@ -72,21 +106,40 @@ import {
                   <summary>Scorecards ({{ round.friends.length + 1 }} players)</summary>
                   <div class="scorecard-scroll">
                     <table class="scorecard">
-                      <caption>{{ round.course }} - {{ formatDate(round.date) }}</caption>
+                      <caption>{{ roundTitle(round) }} - {{ formatDate(round.date) }}</caption>
                       <thead>
                         <tr>
                           <th scope="col">Player</th>
                           @for (hole of round.holes; track $index) {
-                            <th scope="col">{{ $index + 1 }}</th>
+                            <th scope="col">{{ scorecardHoleNumber(round, $index) }}</th>
                           }
                           <th scope="col">Total</th>
                         </tr>
                       </thead>
                       <tbody>
+                        <tr class="par-row">
+                          <th scope="row">Par</th>
+                          @for (hole of round.holes; track $index) {
+                            <td>{{ parForHole(round, $index) ?? '-' }}</td>
+                          }
+                          <td>-</td>
+                        </tr>
                         <tr>
                           <th scope="row">{{ round.playerName }}</th>
                           @for (strokes of round.holes; track $index) {
-                            <td>{{ strokes ?? '-' }}</td>
+                            <td>
+                              @if (strokes === null) {
+                                -
+                              } @else {
+                                <span
+                                  class="score-marker"
+                                  [class.score-marker-birdie]="scoreMarker(round, $index, strokes) === 'birdie'"
+                                  [class.score-marker-bogey]="scoreMarker(round, $index, strokes) === 'bogey'"
+                                  [class.score-marker-double-bogey]="scoreMarker(round, $index, strokes) === 'double-bogey'"
+                                  [class.score-marker-worse]="scoreMarker(round, $index, strokes) === 'worse'"
+                                >{{ strokes }}</span>
+                              }
+                            </td>
                           }
                           <td>{{ round.score }}</td>
                         </tr>
@@ -94,7 +147,19 @@ import {
                           <tr>
                             <th scope="row">{{ friend.name }}</th>
                             @for (strokes of friend.holes; track $index) {
-                              <td>{{ strokes ?? '-' }}</td>
+                              <td>
+                                @if (strokes === null) {
+                                  -
+                                } @else {
+                                  <span
+                                    class="score-marker"
+                                    [class.score-marker-birdie]="scoreMarker(round, $index, strokes) === 'birdie'"
+                                    [class.score-marker-bogey]="scoreMarker(round, $index, strokes) === 'bogey'"
+                                    [class.score-marker-double-bogey]="scoreMarker(round, $index, strokes) === 'double-bogey'"
+                                    [class.score-marker-worse]="scoreMarker(round, $index, strokes) === 'worse'"
+                                  >{{ strokes }}</span>
+                                }
+                              </td>
                             }
                             <td>
                               {{ recordedStrokes(friend.holes) }}@if (hasUnrecordedHoles(friend.holes)) { * }
@@ -191,11 +256,21 @@ import {
                   [(ngModel)]="playerScorecards"
                 ></textarea>
               </label>
+              @if (scorecardHoleCount === 9) {
+                <label>
+                  Nine-hole segment
+                  <select name="startingHole" [(ngModel)]="startingHole">
+                    <option [ngValue]="1">Front nine (holes 1–9)</option>
+                    <option [ngValue]="10">Back nine (holes 10–18)</option>
+                  </select>
+                </label>
+              }
             </div>
             <p class="form-help">
               Your name and scorecard go on the first line. Add friends on following lines.
               Use 9 or 18 hole scores and - for an unrecorded hole. Totals are calculated from
-              recorded scores. Player names and scores will be public.
+              recorded scores. For configured 18-hole courses, choose front or back nine when
+              entering a 9-hole round. Player names and scores will be public.
             </p>
             <div class="form-actions">
               <button type="submit" [disabled]="busy">
@@ -245,6 +320,7 @@ import {
 })
 export class GolfLogComponent implements OnInit, OnDestroy {
   rounds: GolfRound[] = [];
+  courseConfigs: GolfCourse[] = [];
   loading = true;
   busy = false;
   loadError = '';
@@ -252,7 +328,9 @@ export class GolfLogComponent implements OnInit, OnDestroy {
   notice = '';
   adminEmail = '';
   adminPassword = '';
+  selectedPlayers: string[] = [];
   selectedCourse = '';
+  startingHole: 1 | 10 = 1;
   roundDate = '';
   course = '';
   playerScorecards = '';
@@ -263,14 +341,37 @@ export class GolfLogComponent implements OnInit, OnDestroy {
   private unsubscribeAuth?: () => void;
 
   get courses(): string[] {
-    return [...new Set(this.rounds.map((round) => round.course))]
+    return [...new Set([
+      ...this.rounds.map((round) => round.course),
+      ...this.courseConfigs.map((course) => course.name)
+    ])]
       .sort((left, right) => left.localeCompare(right));
+  }
+
+  get scorecardHoleCount(): number {
+    const firstLine = this.playerScorecards.split(/\r?\n/).find((line) => line.trim());
+    const separator = firstLine?.indexOf('|') ?? -1;
+    return separator < 0 || !firstLine
+      ? 0
+      : firstLine.slice(separator + 1).split(',').length;
+  }
+
+  get players(): string[] {
+    return [...new Set(this.rounds.flatMap((round) => [
+      round.playerName,
+      ...round.friends.map((friend) => friend.name)
+    ]))]
+      .sort((left, right) => left.localeCompare(right));
+  }
+
+  get roundsMatchingPlayers(): GolfRound[] {
+    return this.rounds.filter((round) => this.matchesSelectedPlayers(round));
   }
 
   get filteredRounds(): GolfRound[] {
     return this.selectedCourse
-      ? this.rounds.filter((round) => round.course === this.selectedCourse)
-      : this.rounds;
+      ? this.roundsMatchingPlayers.filter((round) => round.course === this.selectedCourse)
+      : this.roundsMatchingPlayers;
   }
 
   constructor(private readonly golfLog: GolfLogService) {}
@@ -281,6 +382,7 @@ export class GolfLogComponent implements OnInit, OnDestroy {
         void this.updateSession(session);
       });
       await this.refreshRounds();
+      await this.refreshCourseConfigs();
       await this.updateSession(await this.golfLog.getSession());
     } catch (error) {
       console.error('Unable to initialize golf log.', error);
@@ -353,6 +455,32 @@ export class GolfLogComponent implements OnInit, OnDestroy {
     }
   }
 
+  async deleteRound(round: GolfRound): Promise<void> {
+    const confirmation = `Delete ${this.roundTitle(round)} from ${this.formatDate(round.date)}? This cannot be undone.`;
+    if (!window.confirm(confirmation)) {
+      return;
+    }
+
+    this.busy = true;
+    this.authError = '';
+    this.notice = '';
+    try {
+      await this.golfLog.deleteRound(round.id);
+      if (this.editRoundId === round.id) {
+        this.cancelEditing();
+      }
+      const refreshed = await this.refreshRounds();
+      this.notice = refreshed
+        ? 'Round deleted successfully.'
+        : 'Round deleted successfully, but the round list could not be refreshed. Reload the page to see the updated list.';
+    } catch (error) {
+      console.error('Unable to delete golf round.', error);
+      this.authError = this.describeError(error);
+    } finally {
+      this.busy = false;
+    }
+  }
+
   async importRounds(event: Event): Promise<void> {
     const input = event.target;
     if (!(input instanceof HTMLInputElement)) {
@@ -401,7 +529,68 @@ export class GolfLogComponent implements OnInit, OnDestroy {
   }
 
   countRoundsAt(courseName: string): number {
-    return this.rounds.filter((round) => round.course === courseName).length;
+    return this.roundsMatchingPlayers.filter((round) => round.course === courseName).length;
+  }
+
+  clearPlayerFilter(): void {
+    this.selectedPlayers = [];
+  }
+
+  togglePlayer(player: string, event: Event): void {
+    const input = event.target;
+    if (!(input instanceof HTMLInputElement)) {
+      return;
+    }
+
+    this.selectedPlayers = input.checked
+      ? [...this.selectedPlayers, player]
+      : this.selectedPlayers.filter((selectedPlayer) => selectedPlayer !== player);
+  }
+
+  roundTitle(round: GolfRound): string {
+    const holesPlayed = round.holes.filter((strokes) => strokes !== null).length;
+    return holesPlayed === 18 ? round.course : `${round.course} (${holesPlayed} holes)`;
+  }
+
+  scorecardHoleNumber(round: GolfRound, index: number): number {
+    const courseConfig = this.courseConfigs.find((course) => course.name === round.course);
+    if (courseConfig?.pars.length === 9) {
+      return index + 1;
+    }
+    return round.holes.length === 9 && round.startingHole === 10 ? index + 10 : index + 1;
+  }
+
+  parForHole(round: GolfRound, index: number): number | null {
+    const course = this.courseConfigs.find((item) => item.name === round.course);
+    if (!course) {
+      return null;
+    }
+
+    const parIndex = courseHoleIndex(
+      course.pars.length,
+      round.holes,
+      round.startingHole,
+      index
+    );
+    return parIndex === null ? null : course.pars[parIndex];
+  }
+
+  scoreMarker(
+    round: GolfRound,
+    index: number,
+    strokes: number
+  ): 'birdie' | 'bogey' | 'double-bogey' | 'worse' | null {
+    const par = this.parForHole(round, index);
+    if (par === null || strokes === par) {
+      return null;
+    }
+    if (strokes < par) {
+      return 'birdie';
+    }
+    if (strokes === par + 1) {
+      return 'bogey';
+    }
+    return strokes === par + 2 ? 'double-bogey' : 'worse';
   }
 
   recordedStrokes(holes: (number | null)[]): number {
@@ -420,10 +609,24 @@ export class GolfLogComponent implements OnInit, OnDestroy {
     return round.friends.some((friend) => this.friendHasUnrecordedHoles(friend));
   }
 
+  private matchesSelectedPlayers(round: GolfRound): boolean {
+    if (this.selectedPlayers.length === 0) {
+      return true;
+    }
+
+    const roundPlayers = new Set([
+      round.playerName,
+      ...round.friends.map((friend) => friend.name)
+    ].map((name) => name.toLocaleLowerCase()));
+
+    return this.selectedPlayers.every((player) => roundPlayers.has(player.toLocaleLowerCase()));
+  }
+
   startEditing(round: GolfRound): void {
     this.editRoundId = round.id;
     this.roundDate = round.date;
     this.course = round.course;
+    this.startingHole = round.startingHole;
     this.playerScorecards = [
       `${round.playerName} | ${round.holes.map((strokes) => strokes ?? '-').join(', ')}`,
       ...round.friends.map(
@@ -442,6 +645,7 @@ export class GolfLogComponent implements OnInit, OnDestroy {
     this.editRoundId = null;
     this.roundDate = '';
     this.course = '';
+    this.startingHole = 1;
     this.playerScorecards = '';
   }
 
@@ -480,6 +684,15 @@ export class GolfLogComponent implements OnInit, OnDestroy {
     }
   }
 
+  private async refreshCourseConfigs(): Promise<void> {
+    try {
+      this.courseConfigs = await this.golfLog.getCourseConfigs();
+    } catch (error) {
+      console.error('Unable to load golf course configurations.', error);
+      this.loadError = this.describeError(error);
+    }
+  }
+
   private createRoundFromForm(): ImportedGolfRound {
     const date = new Date(`${this.roundDate}T00:00:00Z`);
     if (
@@ -507,7 +720,8 @@ export class GolfLogComponent implements OnInit, OnDestroy {
       playerName: player.name,
       score,
       holes: player.holes,
-      friends: scorecards.slice(1).map(({ name, holes }) => ({ name, holes }))
+      friends: scorecards.slice(1).map(({ name, holes }) => ({ name, holes })),
+      startingHole: player.holes.length === 9 ? this.startingHole : 1
     };
   }
 

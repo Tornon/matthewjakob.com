@@ -46,28 +46,51 @@ as $$
   end;
 $$;
 
+create function public.valid_golf_course_pars(pars integer[])
+returns boolean
+language sql
+immutable
+strict
+as $$
+  select cardinality(pars) in (9, 18)
+    and array_position(pars, null::integer) is null
+    and not exists (
+      select 1
+      from unnest(pars) as hole(par)
+      where par not between 3 and 6
+    );
+$$;
+
 create table public.golf_log_admins (
   user_id uuid primary key references auth.users (id) on delete cascade
+);
+
+create table public.golf_courses (
+  name text primary key check (length(trim(name)) between 1 and 160),
+  pars integer[] not null check (public.valid_golf_course_pars(pars))
 );
 
 create table public.golf_rounds (
   id uuid primary key default gen_random_uuid(),
   played_on date not null,
   course text not null check (length(trim(course)) > 0),
+  starting_hole smallint not null default 1,
   player_name text not null default 'You'
     check (length(trim(player_name)) between 1 and 80),
   total_strokes integer not null check (total_strokes > 0),
   hole_strokes integer[] not null check (public.valid_golf_hole_strokes(hole_strokes)),
   friend_scores jsonb not null default '[]'::jsonb
     check (public.valid_golf_friend_scores(friend_scores, cardinality(hole_strokes))),
+  check (starting_hole in (1, 10) and (starting_hole = 1 or cardinality(hole_strokes) = 9)),
   created_at timestamptz not null default now(),
-  unique (played_on, course, total_strokes, hole_strokes)
+  unique (played_on, course, starting_hole, total_strokes, hole_strokes)
 );
 
 create index golf_rounds_played_on_idx
   on public.golf_rounds (played_on desc, created_at desc);
 
 alter table public.golf_log_admins enable row level security;
+alter table public.golf_courses enable row level security;
 alter table public.golf_rounds enable row level security;
 grant usage on schema public to anon, authenticated;
 
@@ -90,6 +113,27 @@ grant execute on function public.is_golf_log_admin() to anon, authenticated;
 
 grant select on public.golf_rounds to anon, authenticated;
 grant insert, update, delete on public.golf_rounds to authenticated;
+grant select on public.golf_courses to anon, authenticated;
+grant insert, update on public.golf_courses to authenticated;
+
+create policy "Golf courses are publicly readable"
+  on public.golf_courses
+  for select
+  to anon, authenticated
+  using (true);
+
+create policy "Golf log admins can add courses"
+  on public.golf_courses
+  for insert
+  to authenticated
+  with check ((select public.is_golf_log_admin()));
+
+create policy "Golf log admins can edit courses"
+  on public.golf_courses
+  for update
+  to authenticated
+  using ((select public.is_golf_log_admin()))
+  with check ((select public.is_golf_log_admin()));
 
 create policy "Golf rounds are publicly readable"
   on public.golf_rounds

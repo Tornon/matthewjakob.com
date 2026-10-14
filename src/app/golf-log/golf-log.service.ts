@@ -5,10 +5,32 @@ export interface GolfRound {
   id: string;
   date: string;
   course: string;
+  startingHole: 1 | 10;
   playerName: string;
   score: number;
   holes: (number | null)[];
   friends: GolfFriendScore[];
+}
+
+export function courseHoleIndex(
+  parCount: number,
+  holes: (number | null)[],
+  startingHole: 1 | 10,
+  scoreIndex: number
+): number | null {
+  if (parCount === 9) {
+    return holes.length === 9 ? scoreIndex : null;
+  }
+
+  const courseHole = holes.length === 9 && startingHole === 10
+    ? scoreIndex + 9
+    : scoreIndex;
+  return courseHole < parCount ? courseHole : null;
+}
+
+export interface GolfCourse {
+  name: string;
+  pars: number[];
 }
 
 export interface GolfFriendScore {
@@ -19,6 +41,7 @@ export interface GolfFriendScore {
 export interface ImportedGolfRound {
   date: string;
   course: string;
+  startingHole?: 1 | 10;
   playerName?: string;
   score: number;
   holes: (number | null)[];
@@ -39,6 +62,7 @@ interface DatabaseGolfRound {
   id: string;
   played_on: string;
   course: string;
+  starting_hole: 1 | 10;
   player_name: string;
   total_strokes: number;
   hole_strokes: (number | null)[];
@@ -247,7 +271,7 @@ export class GolfLogService {
   async getRounds(): Promise<GolfRound[]> {
     const { data, error } = await (await this.getClient())
       .from('golf_rounds')
-      .select('id, played_on, course, player_name, total_strokes, hole_strokes, friend_scores')
+      .select('id, played_on, course, starting_hole, player_name, total_strokes, hole_strokes, friend_scores')
       .order('played_on', { ascending: false })
       .order('created_at', { ascending: false });
 
@@ -266,6 +290,7 @@ export class GolfLogService {
         id: round.id,
         date: round.played_on,
         course: round.course,
+        startingHole: round.starting_hole,
         playerName: round.player_name,
         score: round.total_strokes,
         holes: round.hole_strokes,
@@ -274,10 +299,34 @@ export class GolfLogService {
     });
   }
 
+  async getCourseConfigs(): Promise<GolfCourse[]> {
+    const { data, error } = await (await this.getClient())
+      .from('golf_courses')
+      .select('name, pars')
+      .order('name', { ascending: true });
+
+    if (error) {
+      throw error;
+    }
+
+    return data as GolfCourse[];
+  }
+
+  async saveCourseConfig(name: string, pars: number[]): Promise<void> {
+    const { error } = await (await this.getClient())
+      .from('golf_courses')
+      .upsert({ name: name.trim(), pars }, { onConflict: 'name' });
+
+    if (error) {
+      throw error;
+    }
+  }
+
   async addRound(round: ImportedGolfRound): Promise<void> {
     const { error } = await (await this.getClient()).from('golf_rounds').insert({
       played_on: round.date,
       course: round.course.trim(),
+      starting_hole: round.startingHole ?? 1,
       player_name: round.playerName?.trim() || 'You',
       total_strokes: round.score,
       hole_strokes: round.holes,
@@ -295,6 +344,7 @@ export class GolfLogService {
       .update({
         played_on: round.date,
         course: round.course.trim(),
+        starting_hole: round.startingHole ?? 1,
         player_name: round.playerName?.trim() || 'You',
         total_strokes: round.score,
         hole_strokes: round.holes,
@@ -304,6 +354,22 @@ export class GolfLogService {
 
     if (error) {
       throw error;
+    }
+  }
+
+  async deleteRound(id: string): Promise<void> {
+    const { data, error } = await (await this.getClient())
+      .from('golf_rounds')
+      .delete()
+      .eq('id', id)
+      .select('id')
+      .maybeSingle();
+
+    if (error) {
+      throw error;
+    }
+    if (!data) {
+      throw new Error('The round was not deleted. It may no longer exist or you may not have permission.');
     }
   }
 
@@ -319,13 +385,14 @@ export class GolfLogService {
           batch.map((round) => ({
             played_on: round.date,
             course: round.course.trim(),
+            starting_hole: round.startingHole ?? 1,
             player_name: round.playerName?.trim() || 'You',
             total_strokes: round.score,
             hole_strokes: round.holes,
             friend_scores: []
           })),
           {
-            onConflict: 'played_on,course,total_strokes,hole_strokes',
+            onConflict: 'played_on,course,starting_hole,total_strokes,hole_strokes',
             ignoreDuplicates: true
           }
         )
