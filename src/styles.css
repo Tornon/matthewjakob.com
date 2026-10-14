@@ -639,6 +639,54 @@ a.course-setup-badge:focus-visible {
     padding: 18px;
   }
 
+  .scorecard-scroll {
+    margin-right: -8px;
+    margin-left: -8px;
+    padding: 0 8px 6px;
+  }
+
+  .round-card .scorecard {
+    width: max-content;
+    min-width: 100%;
+    font-size: .8rem;
+  }
+
+  .round-card .scorecard th,
+  .round-card .scorecard td {
+    min-width: 32px;
+    padding: 6px 4px;
+  }
+
+  .round-card .scorecard th:first-child {
+    min-width: 68px;
+  }
+
+  .round-card .scorecard .score-marker {
+    width: 22px;
+    height: 22px;
+  }
+
+  .round-card .scorecard .scorecard-subtotal {
+    font-size: .82rem;
+  }
+
+  .round-card .scorecard .scorecard-total {
+    font-size: .86rem;
+  }
+
+  .round-card .scorecard .par-row {
+    font-size: .78rem;
+  }
+
+  .round-card .scorecard .par-row .par-front-total,
+  .round-card .scorecard .par-row .par-back-total {
+    font-size: .84rem;
+  }
+
+  .round-card .scorecard .par-row .par-round-total {
+    font-size: .88rem;
+  }
+
   .round-heading {
     align-items: flex-start;
   }
