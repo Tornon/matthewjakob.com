@@ -24,7 +24,17 @@ interface ScorecardEntry {
   template: `
     <main class="golf-log">
       <a class="back-link" routerLink="/">&larr; Back to home</a>
-      <h1>Golf Log</h1>
+      <div class="golf-log-heading">
+        <h1>Golf Log</h1>
+        @if (canManage) {
+          <button
+            type="button"
+            class="add-round-button"
+            [disabled]="busy"
+            (click)="startAddingRound()"
+          >Add a new round</button>
+        }
+      </div>
       <p class="intro">A place to keep track of rounds played with friends.</p>
       <p class="course-details-link">
         <a routerLink="/golf-courses">Course details &amp; stats</a>
@@ -102,7 +112,7 @@ interface ScorecardEntry {
                       routerLink="/golf-course-notes"
                       [queryParams]="{ course: round.course }"
                     >
-                      <span>Course notes &amp; ratings</span>
+                      <span>Notes &amp; Course Config</span>
                       <span class="round-course-rating" [attr.aria-label]="courseRatingLabel(round.course)">
                         @if (courseRatingSummary(round.course); as rating) {
                           @if (rating.totalRatings > 0) {
@@ -118,7 +128,7 @@ interface ScorecardEntry {
                     @if (!isCourseConfigured(round.course)) {
                       <a
                         class="course-setup-badge"
-                        routerLink="/golf-courses"
+                        routerLink="/golf-course-notes"
                         [queryParams]="{ course: round.course }"
                         [attr.aria-label]="'Configure pars for ' + round.course"
                       >Par setup needed <span aria-hidden="true">→</span></a>
@@ -942,6 +952,16 @@ export class GolfLogComponent implements OnInit, OnDestroy {
     ];
     this.notice = `Editing ${round.course} (${this.formatDate(round.date)}). Update the form below and save.`;
     this.authError = '';
+    document.getElementById('round-editor')?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'start'
+    });
+  }
+
+  startAddingRound(): void {
+    this.cancelEditing();
+    this.authError = '';
+    this.notice = '';
     document.getElementById('round-editor')?.scrollIntoView({
       behavior: 'smooth',
       block: 'start'

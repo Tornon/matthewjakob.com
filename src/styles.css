@@ -23,6 +23,44 @@ body {
   font-size: clamp(2.5rem, 8vw, 4rem);
 }
 
+.golf-log-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.golf-log-heading h1 {
+  min-width: 0;
+  margin-bottom: 0;
+}
+
+.add-round-button {
+  flex: 0 0 auto;
+  width: fit-content;
+  padding: 12px 18px;
+  border: 1px solid #16a34a;
+  border-radius: 8px;
+  background: #15803d;
+  color: #f0fdf4;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color .15s, border-color .15s;
+}
+
+.add-round-button:hover,
+.add-round-button:focus-visible {
+  border-color: #4ade80;
+  background: #166534;
+}
+
+.add-round-button:disabled {
+  cursor: wait;
+  opacity: .6;
+}
+
 .pages {
   margin-top: 0;
 }

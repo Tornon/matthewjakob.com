@@ -19,7 +19,7 @@ export const routes: Routes = [
     path: 'golf-course-notes',
     loadComponent: () =>
       import('./golf-courses/golf-course-notes.component').then((module) => module.GolfCourseNotesComponent),
-    title: 'Course Notes'
+    title: 'Notes & Course Config'
   },
   { path: '**', redirectTo: '' }
 ];

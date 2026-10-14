@@ -45,7 +45,7 @@ interface RoundPlayerStats {
     <main class="golf-log">
       <a class="back-link" routerLink="/golf-log">&larr; Back to Golf Log</a>
       <h1>Course Details</h1>
-      <p class="intro">Configure hole pars and review player performance by course.</p>
+      <p class="intro">Review player performance and scoring statistics by course.</p>
 
       @if (loadError) {
         <p class="log-status error" role="alert">{{ loadError }}</p>
@@ -74,15 +74,16 @@ interface RoundPlayerStats {
                 class="secondary-button course-notes-link"
                 routerLink="/golf-course-notes"
                 [queryParams]="{ course: selectedCourse }"
-              >Course notes &amp; ratings</a>
+              >Notes &amp; Course Config</a>
             }
             @if (!allCoursesSelected && !selectedConfig) {
               <div class="course-setup-notice">
                 <span class="course-setup-badge">Par setup needed</span>
                 <p>Hole-by-hole stats are unavailable until this course's pars are configured.</p>
-                @if (canManage) {
-                  <a href="#course-configuration">Configure this course <span aria-hidden="true">↓</span></a>
-                }
+                <a
+                  routerLink="/golf-course-notes"
+                  [queryParams]="{ course: selectedCourse }"
+                >Notes &amp; Course Config <span aria-hidden="true">→</span></a>
               </div>
             } @else {
               <label class="course-filter">
@@ -197,156 +198,6 @@ interface RoundPlayerStats {
         }
       }
 
-      @if (notice) {
-        <p class="log-status" role="status">{{ notice }}</p>
-      }
-      @if (saveError) {
-        <p class="log-status error" role="alert">{{ saveError }}</p>
-      }
-
-      @if (canManage) {
-        <form id="course-configuration" class="admin-form course-config-form" (ngSubmit)="saveConfiguration()">
-          <h2>Course configuration</h2>
-          <div class="form-grid">
-            <label>
-              Course name
-              <input
-                name="configCourseName"
-                type="text"
-                list="course-names"
-                maxlength="160"
-                required
-                [ngModel]="configCourseName"
-                (ngModelChange)="selectConfigurationCourse($event)"
-              >
-              <datalist id="course-names">
-                @for (course of courses; track course) {
-                  <option [value]="course"></option>
-                }
-              </datalist>
-            </label>
-            <label>
-              Holes configured
-              <select
-                name="parHoleCount"
-                [ngModel]="parHoleCount"
-                (ngModelChange)="setParHoleCount($event)"
-              >
-                <option [ngValue]="9">9 holes</option>
-                <option [ngValue]="18">18 holes</option>
-              </select>
-            </label>
-            <fieldset class="par-entry wide-field">
-              <legend>Par for each hole</legend>
-              <div class="hole-entry-grid par-entry-grid">
-                @for (par of pars; track $index; let holeIndex = $index) {
-                  <label>
-                    Hole {{ holeIndex + 1 }}
-                    <input
-                      [name]="'par-' + holeIndex"
-                      type="number"
-                      min="3"
-                      max="6"
-                      step="1"
-                      inputmode="numeric"
-                      [(ngModel)]="pars[holeIndex]"
-                    >
-                  </label>
-                }
-              </div>
-            </fieldset>
-          </div>
-          @if (selectedConfig && !allCoursesSelected) {
-            <section class="course-image-settings" aria-labelledby="course-image-heading">
-              <h3 id="course-image-heading">Scorecard watermark</h3>
-              @if (selectedConfig.backgroundImageUrl) {
-                <div class="course-image-preview-frame">
-                  <img
-                    class="course-image-preview"
-                    [src]="selectedConfig.backgroundImageUrl"
-                    alt="Preview of the scorecard watermark for {{ selectedCourse }}"
-                    [style.opacity]="backgroundImageOpacity"
-                    [style.object-position]="backgroundImagePositionX + '% ' + backgroundImagePositionY + '%'"
-                  >
-                </div>
-                <label>
-                  Watermark opacity: {{ (backgroundImageOpacity * 100).toFixed(0) }}%
-                  <input
-                    name="backgroundImageOpacity"
-                    type="range"
-                    min="0.03"
-                    max="0.5"
-                    step="0.01"
-                    [(ngModel)]="backgroundImageOpacity"
-                  >
-                </label>
-                <label>
-                  Horizontal image position: {{ backgroundImagePositionX }}%
-                  <input
-                    name="backgroundImagePositionX"
-                    type="range"
-                    min="0"
-                    max="100"
-                    step="1"
-                    [(ngModel)]="backgroundImagePositionX"
-                  >
-                </label>
-                <label>
-                  Vertical image position: {{ backgroundImagePositionY }}%
-                  <input
-                    name="backgroundImagePositionY"
-                    type="range"
-                    min="0"
-                    max="100"
-                    step="1"
-                    [(ngModel)]="backgroundImagePositionY"
-                  >
-                </label>
-                <button
-                  type="button"
-                  class="secondary-button"
-                  [disabled]="saving"
-                  (click)="saveWatermarkSettings()"
-                >Save watermark settings</button>
-              } @else {
-                <p class="form-help">Upload an image to show as a faint watermark behind this course's scorecards.</p>
-              }
-              <label>
-                Course image (JPEG, PNG, or WebP; up to 5 MB)
-                <input
-                  name="courseBackgroundImage"
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp"
-                  [disabled]="saving"
-                  (change)="selectBackgroundImage($event)"
-                >
-              </label>
-              @if (selectedBackgroundFile) {
-                <p class="form-help">Selected: {{ selectedBackgroundFile.name }}</p>
-              }
-              <button
-                type="button"
-                [disabled]="saving || !selectedBackgroundFile"
-                (click)="uploadBackgroundImage()"
-              >
-                {{ saving ? 'Uploading...' : 'Upload course image' }}
-              </button>
-            </section>
-          }
-          <p class="form-help">
-            Enter a par from 3 to 6 for every hole.
-            For a 9-hole scorecard on an 18-hole course, choose front or back nine when adding
-            the round in the Golf Log.
-          </p>
-          <button type="submit" [disabled]="saving">
-            {{ saving ? 'Saving...' : 'Save course pars' }}
-          </button>
-        </form>
-      } @else {
-        <p class="form-help course-config-access">
-          Sign in as an authorized admin on the <a routerLink="/golf-log">Golf Log</a> to configure course pars.
-        </p>
-      }
     </main>
   `
 })
@@ -356,20 +207,9 @@ export class GolfCoursesComponent implements OnInit {
   rounds: GolfRound[] = [];
   courseConfigs: GolfCourse[] = [];
   loading = true;
-  saving = false;
-  canManage = false;
   loadError = '';
-  saveError = '';
-  notice = '';
   selectedCourse = '';
   selectedPlayer = '';
-  configCourseName = '';
-  parHoleCount: 9 | 18 = 18;
-  pars: (number | null)[] = Array.from({ length: 18 }, () => null);
-  backgroundImageOpacity = 0.12;
-  backgroundImagePositionX = 50;
-  backgroundImagePositionY = 50;
-  selectedBackgroundFile: File | null = null;
 
   constructor(
     private readonly golfLog: GolfLogService,
@@ -559,10 +399,9 @@ export class GolfCoursesComponent implements OnInit {
 
   async ngOnInit(): Promise<void> {
     try {
-      const [rounds, courseConfigs, session] = await Promise.all([
+      const [rounds, courseConfigs] = await Promise.all([
         this.golfLog.getRounds(),
-        this.golfLog.getCourseConfigs(),
-        this.golfLog.getSession()
+        this.golfLog.getCourseConfigs()
       ]);
       this.rounds = rounds;
       this.courseConfigs = courseConfigs;
@@ -571,7 +410,6 @@ export class GolfCoursesComponent implements OnInit {
         (course) => course.toLocaleLowerCase() === requestedCourse?.toLocaleLowerCase()
       ) ?? this.allCoursesValue;
       this.selectCourse(this.selectedCourse);
-      this.canManage = session !== null && await this.golfLog.isAdmin();
     } catch (error) {
       console.error('Unable to load golf course details.', error);
       this.loadError = this.describeError(error);
@@ -583,152 +421,6 @@ export class GolfCoursesComponent implements OnInit {
   selectCourse(course: string): void {
     this.selectedCourse = course;
     this.selectedPlayer = '';
-    this.configCourseName = course === this.allCoursesValue ? '' : course;
-    const config = this.courseConfigs.find((item) => item.name === course);
-    this.parHoleCount = config?.pars.length === 9 ? 9 : 18;
-    this.pars = config
-      ? [...config.pars]
-      : Array.from({ length: this.parHoleCount }, () => null);
-    if (this.pars.length !== this.parHoleCount) {
-      this.pars = Array.from(
-        { length: this.parHoleCount },
-        (_, index) => this.pars[index] ?? null
-      );
-    }
-    this.backgroundImageOpacity = config?.backgroundImageOpacity ?? 0.12;
-    this.backgroundImagePositionX = config?.backgroundImagePositionX ?? 50;
-    this.backgroundImagePositionY = config?.backgroundImagePositionY ?? 50;
-    this.selectedBackgroundFile = null;
-  }
-
-  selectConfigurationCourse(courseName: string): void {
-    this.configCourseName = courseName;
-    const existingCourse = this.courses.find(
-      (course) => course.toLocaleLowerCase() === courseName.trim().toLocaleLowerCase()
-    );
-    if (existingCourse) {
-      this.selectCourse(existingCourse);
-    }
-  }
-
-  setParHoleCount(holeCount: 9 | 18): void {
-    this.parHoleCount = holeCount;
-    this.pars = Array.from(
-      { length: holeCount },
-      (_, index) => this.pars[index] ?? null
-    );
-  }
-
-  selectBackgroundImage(event: Event): void {
-    const input = event.target;
-    if (!(input instanceof HTMLInputElement)) {
-      return;
-    }
-
-    const file = input.files?.[0] ?? null;
-    input.value = '';
-    this.saveError = '';
-    if (!file) {
-      return;
-    }
-    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
-      this.saveError = 'Choose a JPEG, PNG, or WebP image.';
-      return;
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      this.saveError = 'Course images must be 5 MB or smaller.';
-      return;
-    }
-    this.selectedBackgroundFile = file;
-  }
-
-  async uploadBackgroundImage(): Promise<void> {
-    if (!this.selectedConfig || !this.selectedBackgroundFile || this.allCoursesSelected) {
-      this.saveError = 'Save this course configuration before uploading its image.';
-      return;
-    }
-
-    this.saving = true;
-    this.saveError = '';
-    this.notice = '';
-    try {
-      await this.golfLog.uploadCourseBackground(
-        this.selectedCourse,
-        this.selectedBackgroundFile,
-        Number(this.backgroundImageOpacity),
-        Number(this.backgroundImagePositionX),
-        Number(this.backgroundImagePositionY)
-      );
-      this.courseConfigs = await this.golfLog.getCourseConfigs();
-      this.selectedBackgroundFile = null;
-      this.notice = `Scorecard watermark uploaded for ${this.selectedCourse}.`;
-    } catch (error) {
-      console.error('Unable to upload course background image.', error);
-      this.saveError = this.describeError(error);
-    } finally {
-      this.saving = false;
-    }
-  }
-
-  async saveWatermarkSettings(): Promise<void> {
-    if (!this.selectedConfig || this.allCoursesSelected) {
-      return;
-    }
-
-    this.saving = true;
-    this.saveError = '';
-    this.notice = '';
-    try {
-      const savedSettings = await this.golfLog.updateCourseWatermarkSettings(
-        this.selectedCourse,
-        Number(this.backgroundImageOpacity),
-        Number(this.backgroundImagePositionX),
-        Number(this.backgroundImagePositionY)
-      );
-      this.backgroundImageOpacity = savedSettings.opacity;
-      this.backgroundImagePositionX = savedSettings.positionX;
-      this.backgroundImagePositionY = savedSettings.positionY;
-      this.courseConfigs = await this.golfLog.getCourseConfigs();
-      this.notice = `Watermark settings saved for ${this.selectedCourse}.`;
-    } catch (error) {
-      console.error('Unable to save course watermark settings.', error);
-      this.saveError = this.describeError(error);
-    } finally {
-      this.saving = false;
-    }
-  }
-
-  async saveConfiguration(): Promise<void> {
-    this.saving = true;
-    this.saveError = '';
-    this.notice = '';
-
-    try {
-      const name = this.configCourseName.trim();
-      if (!name || name.length > 160) {
-        throw new Error('Enter a course name between 1 and 160 characters.');
-      }
-
-      const pars = this.pars.filter((par): par is number => par !== null);
-      if (pars.length !== this.parHoleCount ||
-          pars.some((par) => !Number.isInteger(par) || par < 3 || par > 6)) {
-        throw new Error('Enter a whole-number par from 3 to 6 for every hole.');
-      }
-
-      await this.golfLog.saveCourseConfig(name, pars);
-      this.courseConfigs = await this.golfLog.getCourseConfigs();
-      this.selectedCourse = name;
-      this.selectedPlayer = '';
-      this.configCourseName = name;
-      this.parHoleCount = pars.length as 9 | 18;
-      this.pars = [...pars];
-      this.notice = `Pars saved for ${name}.`;
-    } catch (error) {
-      console.error('Unable to save course configuration.', error);
-      this.saveError = this.describeError(error);
-    } finally {
-      this.saving = false;
-    }
   }
 
   formatDate(date: string): string {
