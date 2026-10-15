@@ -1,6 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import {
   courseHoleIndex,
   GolfLogService,
@@ -95,6 +95,13 @@ interface RoundPlayerStats {
                   }
                 </select>
               </label>
+              @if (selectedPlayer) {
+                <button type="button" class="player-stats-button" (click)="openPlayerStats()">
+                  <span>Best &amp; Worst Holes</span>
+                  <span class="player-stats-link-player">{{ selectedPlayer }}</span>
+                  <span class="player-stats-link-arrow" aria-hidden="true">→</span>
+                </button>
+              }
               <p class="form-help">
                 Averages and counts include recorded holes only. Eagles exclude hole-in-ones;
                 worse means four or more over par. All-course hole stats use each course's
@@ -213,7 +220,8 @@ export class GolfCoursesComponent implements OnInit {
 
   constructor(
     private readonly golfLog: GolfLogService,
-    private readonly route: ActivatedRoute
+    private readonly route: ActivatedRoute,
+    private readonly router: Router
   ) {}
 
   get courses(): string[] {
@@ -410,6 +418,10 @@ export class GolfCoursesComponent implements OnInit {
         (course) => course.toLocaleLowerCase() === requestedCourse?.toLocaleLowerCase()
       ) ?? this.allCoursesValue;
       this.selectCourse(this.selectedCourse);
+      const requestedPlayer = this.route.snapshot.queryParamMap.get('player');
+      this.selectedPlayer = this.players.find(
+        (player) => player.toLocaleLowerCase() === requestedPlayer?.toLocaleLowerCase()
+      ) ?? '';
     } catch (error) {
       console.error('Unable to load golf course details.', error);
       this.loadError = this.describeError(error);
@@ -421,6 +433,15 @@ export class GolfCoursesComponent implements OnInit {
   selectCourse(course: string): void {
     this.selectedCourse = course;
     this.selectedPlayer = '';
+  }
+
+  openPlayerStats(): Promise<boolean> {
+    return this.router.navigate(['/golf-player-stats'], {
+      queryParams: {
+        player: this.selectedPlayer,
+        course: this.allCoursesSelected ? null : this.selectedCourse
+      }
+    });
   }
 
   formatDate(date: string): string {

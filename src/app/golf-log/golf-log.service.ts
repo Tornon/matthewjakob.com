@@ -469,7 +469,10 @@ export class GolfLogService {
     return data.map((item) => ({
       holeNumber: item.hole_number,
       imagePath: item.image_path,
-      imageUrl: client.storage.from('golf-course-images').getPublicUrl(item.image_path).data.publicUrl
+      imageUrl: client.storage
+        .from('golf-course-images')
+        .getPublicUrl(decodeURIComponent(item.image_path))
+        .data.publicUrl
     }));
   }
 
@@ -480,7 +483,7 @@ export class GolfLogService {
   ): Promise<void> {
     const client = await this.getClient();
     const extension = file.type === 'image/jpeg' ? 'jpg' : file.type.slice('image/'.length);
-    const path = `holes/${encodeURIComponent(courseName)}/hole-${holeNumber}-${crypto.randomUUID()}.${extension}`;
+    const path = `holes/${crypto.randomUUID()}-${holeNumber}.${extension}`;
     const { error: uploadError } = await client.storage
       .from('golf-course-images')
       .upload(path, file, { contentType: file.type, upsert: false });
@@ -626,7 +629,19 @@ export class GolfLogService {
     };
   }
 
-  async addRound(round: ImportedGolfRound): Promise<void> {
+  async addRound(round: ImportedGolfRound): Promise<'added' | 'merged'> {
+    const existing = (await this.getRounds()).filter((candidate) =>
+      candidate.date === round.date &&
+      candidate.course.trim().toLocaleLowerCase() === round.course.trim().toLocaleLowerCase() &&
+      candidate.startingHole === (round.startingHole ?? 1) &&
+      candidate.holes.length === round.holes.length
+    );
+    if (existing.length > 0) {
+      const mergedRound = this.mergeRoundCards(existing, [round]);
+      await this.saveMergedRound(existing, mergedRound);
+      return 'merged';
+    }
+
     const { error } = await (await this.getClient()).from('golf_rounds').insert({
       played_on: round.date,
       course: round.course.trim(),
@@ -640,6 +655,7 @@ export class GolfLogService {
     if (error) {
       throw error;
     }
+    return 'added';
   }
 
   async updateRound(id: string, round: ImportedGolfRound): Promise<void> {
@@ -694,8 +710,12 @@ export class GolfLogService {
       try {
         const mergedRound = this.mergeRoundCards(groupExisting, groupImported);
         if (groupExisting.length === 0) {
-          await this.addRound(mergedRound);
-          added++;
+          const result = await this.addRound(mergedRound);
+          if (result === 'merged') {
+            merged++;
+          } else {
+            added++;
+          }
           continue;
         }
 

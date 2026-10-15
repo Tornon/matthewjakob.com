@@ -121,16 +121,32 @@ import {
             {{ selectedConfig ? selectedConfig.pars.length : 18 }} holes are shown.
             @if (!selectedConfig) { Configure this course to set its hole count. }
           </p>
-          <nav class="hole-selector" aria-label="Select a hole">
-            @for (hole of holes; track hole) {
-              <button
-                type="button"
-                [class.selected]="selectedHole === hole"
-                [attr.aria-current]="selectedHole === hole ? 'true' : null"
-                (click)="selectHole(hole)"
-              >{{ hole }}</button>
-            }
-          </nav>
+          <div class="hole-selector-controls">
+            <button
+              type="button"
+              class="hole-selector-arrow"
+              aria-label="Previous hole"
+              title="Previous hole"
+              (click)="moveHole(-1)"
+            >←</button>
+            <nav class="hole-selector" aria-label="Select a hole">
+              @for (hole of holes; track hole) {
+                <button
+                  type="button"
+                  [class.selected]="selectedHole === hole"
+                  [attr.aria-current]="selectedHole === hole ? 'true' : null"
+                  (click)="selectHole(hole)"
+                >{{ hole }}</button>
+              }
+            </nav>
+            <button
+              type="button"
+              class="hole-selector-arrow"
+              aria-label="Next hole"
+              title="Next hole"
+              (click)="moveHole(1)"
+            >→</button>
+          </div>
           @if (selectedHole; as hole) {
             <article class="hole-note-card" [attr.aria-labelledby]="'hole-heading-' + hole">
               <h3 [id]="'hole-heading-' + hole">
@@ -564,6 +580,14 @@ export class GolfCourseNotesComponent implements OnInit {
 
   selectHole(holeNumber: number): void {
     this.selectedHole = holeNumber;
+  }
+
+  moveHole(direction: -1 | 1): void {
+    const holeCount = this.holes.length;
+    if (holeCount === 0) {
+      return;
+    }
+    this.selectedHole = ((this.selectedHole - 1 + direction + holeCount) % holeCount) + 1;
   }
 
   notesForHole(holeNumber: number | null): GolfCourseNote[] {

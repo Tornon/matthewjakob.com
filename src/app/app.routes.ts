@@ -16,6 +16,12 @@ export const routes: Routes = [
     title: 'Course Details & Stats'
   },
   {
+    path: 'golf-player-stats',
+    loadComponent: () =>
+      import('./golf-courses/golf-player-stats.component').then((module) => module.GolfPlayerStatsComponent),
+    title: 'Player Hole Stats'
+  },
+  {
     path: 'golf-course-notes',
     loadComponent: () =>
       import('./golf-courses/golf-course-notes.component').then((module) => module.GolfCourseNotesComponent),

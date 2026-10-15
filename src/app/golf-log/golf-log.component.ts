@@ -77,7 +77,7 @@ interface ScorecardEntry {
         <label class="course-filter">
           Filter rounds by course
           <select name="courseFilter" [(ngModel)]="selectedCourse">
-            <option value="">All courses ({{ roundsMatchingPlayers.length }})</option>
+            <option value="">All courses ({{ courses.length }})</option>
             @for (courseName of courses; track courseName) {
               <option [value]="courseName">
                 {{ courseName }}{{ isCourseConfigured(courseName) ? '' : ' — Setup needed' }}
@@ -626,17 +626,24 @@ export class GolfLogComponent implements OnInit, OnDestroy {
     this.notice = '';
     try {
       const round = this.createRoundFromForm();
+      let result: 'added' | 'merged' | 'updated' = 'added';
       if (this.editRoundId) {
         await this.golfLog.updateRound(this.editRoundId, round);
+        result = 'updated';
       } else {
-        await this.golfLog.addRound(round);
+        result = await this.golfLog.addRound(round);
       }
       this.cancelEditing();
       this.selectedCourse = '';
       const refreshed = await this.refreshRounds();
+      const successMessage = result === 'merged'
+        ? 'Player scorecard added to the existing round.'
+        : result === 'updated'
+          ? 'Round updated successfully.'
+          : 'Round added successfully.';
       this.notice = refreshed
-        ? 'Round saved successfully.'
-        : 'Round saved successfully, but the round list could not be refreshed. Reload the page to see it.';
+        ? successMessage
+        : `${successMessage} The round list could not be refreshed. Reload the page to see it.`;
     } catch (error) {
       console.error('Unable to add golf round.', error);
       this.authError = this.describeError(error);

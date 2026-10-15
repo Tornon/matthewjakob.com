@@ -25,6 +25,19 @@ create table if not exists public.golf_course_holes (
   primary key (course_name, hole_number)
 );
 
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values (
+  'golf-course-images',
+  'golf-course-images',
+  true,
+  5242880,
+  array['image/jpeg', 'image/png', 'image/webp']
+)
+on conflict (id) do update
+set public = excluded.public,
+    file_size_limit = excluded.file_size_limit,
+    allowed_mime_types = excluded.allowed_mime_types;
+
 alter table public.golf_course_notes enable row level security;
 alter table public.golf_course_ratings enable row level security;
 alter table public.golf_course_holes enable row level security;
@@ -78,6 +91,13 @@ create policy "Golf admins can update their own course ratings"
   to authenticated
   using ((select public.is_golf_log_admin()) and user_id = (select auth.uid()))
   with check ((select public.is_golf_log_admin()) and user_id = (select auth.uid()));
+
+drop policy if exists "Golf course images are publicly readable" on storage.objects;
+create policy "Golf course images are publicly readable"
+  on storage.objects
+  for select
+  to anon, authenticated
+  using (bucket_id = 'golf-course-images');
 
 drop policy if exists "Golf course hole photos are publicly readable" on public.golf_course_holes;
 create policy "Golf course hole photos are publicly readable"
