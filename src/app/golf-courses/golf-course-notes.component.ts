@@ -24,6 +24,27 @@ import {
       </a>
       <h1>Notes &amp; Course Config</h1>
       <p class="intro">Ratings, course tips, hole-by-hole photos and notes, and course setup.</p>
+      @if (!loading && !loadError && courses.length > 0) {
+        <div class="course-filter-row">
+          <label class="course-filter">
+            Course
+            <select name="selectedCourse" [ngModel]="selectedCourse" (ngModelChange)="selectCourse($event)">
+              @for (course of courses; track course) {
+                <option [value]="course">{{ course }}</option>
+              }
+            </select>
+          </label>
+          @if (selectedCourseTeeTimeUrl; as teeTimeUrl) {
+            <a
+              class="tee-time-button"
+              [href]="teeTimeUrl"
+              target="_blank"
+              rel="noopener noreferrer"
+              [attr.aria-label]="'Book a tee time at ' + selectedCourse"
+            ><span aria-hidden="true">★</span> BOOK TEE TIME</a>
+          }
+        </div>
+      }
 
       @if (loadError) {
         <p class="log-status error" role="alert">{{ loadError }}</p>
@@ -32,15 +53,6 @@ import {
       } @else if (courses.length === 0) {
         <p class="log-status">No courses are available yet. Add a course configuration below.</p>
       } @else {
-        <label class="course-filter">
-          Course
-          <select name="selectedCourse" [ngModel]="selectedCourse" (ngModelChange)="selectCourse($event)">
-            @for (course of courses; track course) {
-              <option [value]="course">{{ course }}</option>
-            }
-          </select>
-        </label>
-
         <section class="course-notes-section" aria-labelledby="course-rating-heading">
           <h2 id="course-rating-heading">{{ selectedCourse }}</h2>
           <div class="course-rating-summary">
@@ -121,99 +133,107 @@ import {
             {{ selectedConfig ? selectedConfig.pars.length : 18 }} holes are shown.
             @if (!selectedConfig) { Configure this course to set its hole count. }
           </p>
-          <div class="hole-selector-controls">
-            <button
-              type="button"
-              class="hole-selector-arrow"
-              aria-label="Previous hole"
-              title="Previous hole"
-              (click)="moveHole(-1)"
-            >←</button>
-            <nav class="hole-selector" aria-label="Select a hole">
-              @for (hole of holes; track hole) {
-                <button
-                  type="button"
-                  [class.selected]="selectedHole === hole"
-                  [attr.aria-current]="selectedHole === hole ? 'true' : null"
-                  (click)="selectHole(hole)"
-                >{{ hole }}</button>
-              }
-            </nav>
-            <button
-              type="button"
-              class="hole-selector-arrow"
-              aria-label="Next hole"
-              title="Next hole"
-              (click)="moveHole(1)"
-            >→</button>
-          </div>
+          <nav class="hole-selector" aria-label="Select a hole">
+            @for (hole of holes; track hole) {
+              <button
+                type="button"
+                [class.selected]="selectedHole === hole"
+                [attr.aria-current]="selectedHole === hole ? 'true' : null"
+                (click)="selectHole(hole)"
+              >{{ hole }}</button>
+            }
+          </nav>
           @if (selectedHole; as hole) {
-            <article class="hole-note-card" [attr.aria-labelledby]="'hole-heading-' + hole">
-              <h3 [id]="'hole-heading-' + hole">
-                Hole {{ hole }}@if (selectedConfig) { <span>· Par {{ selectedConfig.pars[hole - 1] }}</span> }
-              </h3>
-              @if (holeImage(hole); as image) {
-                <img class="hole-photo" [src]="image.imageUrl" alt="Photo of {{ selectedCourse }}, hole {{ hole }}">
-                @if (canManage) {
-                  <button type="button" class="danger-button" [disabled]="saving" (click)="removeHoleImage(hole)">
-                    Remove photo
-                  </button>
-                }
-              } @else {
-                <p class="form-help">No hole photo added yet.</p>
-              }
-
-              @if (canManage) {
-                <div class="hole-photo-upload">
-                  <label>
-                    {{ holeImage(hole) ? 'Replace photo' : 'Upload hole photo' }} (JPEG, PNG, or WebP; up to 5 MB)
-                    <input
-                      [name]="'hole-photo-' + hole"
-                      type="file"
-                      accept="image/jpeg,image/png,image/webp"
-                      [disabled]="saving"
-                      (change)="selectHolePhoto(hole, $event)"
-                    >
-                  </label>
-                  @if (holePhotoFiles[hole]) {
-                    <button type="button" [disabled]="saving" (click)="uploadHolePhoto(hole)">
-                      {{ saving ? 'Uploading...' : 'Save hole photo' }}
-                    </button>
+            <div class="hole-detail-navigation">
+              <button
+                type="button"
+                class="hole-detail-arrow"
+                [attr.aria-label]="'Previous hole, ' + (hole === 1 ? holes.length : hole - 1)"
+                title="Previous hole"
+                (click)="moveHole(-1)"
+              >←</button>
+              <article class="hole-note-card" [attr.aria-labelledby]="'hole-heading-' + hole">
+                <h3 [id]="'hole-heading-' + hole">
+                  Hole {{ hole }}@if (selectedConfig) { <span>· Par {{ selectedConfig.pars[hole - 1] }}</span> }
+                </h3>
+                <div class="hole-photo-frame">
+                  @if (holeImage(hole); as image) {
+                    <img class="hole-photo" [src]="image.imageUrl" alt="Photo of {{ selectedCourse }}, hole {{ hole }}">
+                  } @else {
+                    <p class="hole-photo-empty">No photo for this hole yet.</p>
                   }
                 </div>
-                <form class="course-note-form" (ngSubmit)="addNote(hole)">
-                  <label>
-                    Add a hole note
-                    <textarea
-                      [name]="'hole-note-' + hole"
-                      rows="2"
-                      maxlength="1000"
-                      required
-                      [placeholder]="'Tips or observations for hole ' + hole"
-                      [(ngModel)]="holeNoteDrafts[hole]"
-                    ></textarea>
-                  </label>
-                  <button type="submit" [disabled]="saving || !holeNoteDrafts[hole]?.trim()">Add note</button>
-                </form>
-              }
-
-              @if (notesForHole(hole).length === 0) {
-                <p class="form-help">No notes for this hole yet.</p>
-              } @else {
-                <ul class="course-note-list">
-                  @for (note of notesForHole(hole); track note.id) {
-                    <li>
-                      <p>{{ note.note }}</p>
-                      @if (canManage) {
-                        <button type="button" class="danger-button" [disabled]="saving" (click)="removeNote(note)">
-                          Remove
+                @if (canManage) {
+                  <div class="hole-image-controls">
+                    <div class="hole-photo-upload">
+                      <label>
+                        {{ holeImage(hole) ? 'Replace photo' : 'Upload hole photo' }} (JPEG, PNG, or WebP; up to 5 MB)
+                        <input
+                          [name]="'hole-photo-' + hole"
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp"
+                          [disabled]="saving"
+                          (change)="selectHolePhoto(hole, $event)"
+                        >
+                      </label>
+                      @if (holePhotoFiles[hole]) {
+                        <button type="button" [disabled]="saving" (click)="uploadHolePhoto(hole)">
+                          {{ saving ? 'Uploading...' : 'Save hole photo' }}
                         </button>
                       }
-                    </li>
+                    </div>
+                    @if (holeImage(hole)) {
+                      <button type="button" class="danger-button" [disabled]="saving" (click)="removeHoleImage(hole)">
+                        Remove photo
+                      </button>
+                    }
+                  </div>
+                }
+
+                <section class="hole-notes-content" aria-labelledby="hole-notes-content-heading">
+                  <h4 id="hole-notes-content-heading">Hole notes</h4>
+                  @if (notesForHole(hole).length === 0) {
+                    <p class="form-help">No notes for this hole yet.</p>
+                  } @else {
+                    <ul class="course-note-list">
+                      @for (note of notesForHole(hole); track note.id) {
+                        <li>
+                          <p>{{ note.note }}</p>
+                          @if (canManage) {
+                            <button type="button" class="danger-button" [disabled]="saving" (click)="removeNote(note)">
+                              Remove
+                            </button>
+                          }
+                        </li>
+                      }
+                    </ul>
                   }
-                </ul>
-              }
-            </article>
+                  @if (canManage) {
+                    <form class="course-note-form" (ngSubmit)="addNote(hole)">
+                      <label>
+                        Add a hole note
+                        <textarea
+                          [name]="'hole-note-' + hole"
+                          rows="2"
+                          maxlength="1000"
+                          required
+                          [placeholder]="'Tips or observations for hole ' + hole"
+                          [(ngModel)]="holeNoteDrafts[hole]"
+                        ></textarea>
+                      </label>
+                      <button type="submit" [disabled]="saving || !holeNoteDrafts[hole]?.trim()">Add note</button>
+                    </form>
+                  }
+                </section>
+              </article>
+              <button
+                type="button"
+                class="hole-detail-arrow"
+                [attr.aria-label]="'Next hole, ' + (hole === holes.length ? 1 : hole + 1)"
+                title="Next hole"
+                (click)="moveHole(1)"
+              >→</button>
+            </div>
           }
         </section>
       }
@@ -362,6 +382,29 @@ import {
         </p>
       }
 
+      @if (canManage && configurationCourse) {
+        <form class="admin-form course-tee-time-form" (ngSubmit)="saveTeeTimeUrl()">
+          <h2>Tee time booking link</h2>
+          <label>
+            Tee Time URL
+            <input
+              name="teeTimeUrl"
+              type="url"
+              maxlength="2048"
+              placeholder="https://example.com/book"
+              [(ngModel)]="teeTimeUrlDraft"
+            >
+          </label>
+          <p class="form-help">
+            Add a booking URL to show a BOOK TEE TIME button next to this course's selector.
+            Leave blank and save to remove the button.
+          </p>
+          <button type="submit" [disabled]="saving">
+            {{ saving ? 'Saving...' : 'Save tee time URL' }}
+          </button>
+        </form>
+      }
+
       @if (notice) {
         <p class="log-status" role="status">{{ notice }}</p>
       }
@@ -381,6 +424,7 @@ export class GolfCourseNotesComponent implements OnInit {
   backgroundImagePositionX = 50;
   backgroundImagePositionY = 50;
   selectedBackgroundFile: File | null = null;
+  teeTimeUrlDraft = '';
   notes: GolfCourseNote[] = [];
   ratingSummary: GolfCourseRatingSummary = { totalRatings: 0, averageRating: 0, myRating: 0 };
   holeImages: GolfCourseHoleImage[] = [];
@@ -412,6 +456,10 @@ export class GolfCourseNotesComponent implements OnInit {
 
   get selectedConfig(): GolfCourse | undefined {
     return this.configs.find((course) => course.name === this.selectedCourse);
+  }
+
+  get selectedCourseTeeTimeUrl(): string | null {
+    return this.selectedConfig?.teeTimeUrl?.trim() || null;
   }
 
   get configurationCourse(): GolfCourse | undefined {
@@ -488,6 +536,24 @@ export class GolfCourseNotesComponent implements OnInit {
   setParHoleCount(holeCount: 9 | 18): void {
     this.parHoleCount = holeCount;
     this.pars = Array.from({ length: holeCount }, (_, index) => this.pars[index] ?? null);
+  }
+
+  async saveTeeTimeUrl(): Promise<void> {
+    const config = this.configurationCourse;
+    if (!this.canManage || !config) {
+      return;
+    }
+    await this.performAction(async () => {
+      await this.golfLog.saveCourseTeeTimeUrl(config.name, this.teeTimeUrlDraft);
+      const teeTimeUrl = this.teeTimeUrlDraft.trim() || null;
+      this.configs = this.configs.map((course) =>
+        course.name === config.name ? { ...course, teeTimeUrl } : course
+      );
+      this.teeTimeUrlDraft = teeTimeUrl ?? '';
+      this.notice = teeTimeUrl
+        ? `Tee time URL saved for ${config.name}.`
+        : `Tee time URL removed for ${config.name}.`;
+    });
   }
 
   selectBackgroundImage(event: Event): void {
@@ -707,6 +773,7 @@ export class GolfCourseNotesComponent implements OnInit {
     this.backgroundImageOpacity = config?.backgroundImageOpacity ?? 0.12;
     this.backgroundImagePositionX = config?.backgroundImagePositionX ?? 50;
     this.backgroundImagePositionY = config?.backgroundImagePositionY ?? 50;
+    this.teeTimeUrlDraft = config?.teeTimeUrl ?? '';
     this.selectedBackgroundFile = null;
   }
 

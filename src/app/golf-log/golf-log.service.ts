@@ -31,6 +31,7 @@ export function courseHoleIndex(
 export interface GolfCourse {
   name: string;
   pars: number[];
+  teeTimeUrl?: string | null;
   backgroundImagePath?: string | null;
   backgroundImageOpacity?: number;
   backgroundImagePositionX?: number;
@@ -334,7 +335,7 @@ export class GolfLogService {
     const { data, error } = await (await this.getClient())
       .from('golf_courses')
       .select(
-        'name, pars, background_image_path, background_image_opacity, background_image_position_x, background_image_position_y'
+        'name, pars, tee_time_url, background_image_path, background_image_opacity, background_image_position_x, background_image_position_y'
       )
       .order('name', { ascending: true });
 
@@ -346,6 +347,7 @@ export class GolfLogService {
     return data.map((course) => ({
       name: course.name,
       pars: course.pars,
+      teeTimeUrl: course.tee_time_url,
       backgroundImagePath: course.background_image_path,
       backgroundImageOpacity: course.background_image_opacity,
       backgroundImagePositionX: course.background_image_position_x,
@@ -363,6 +365,35 @@ export class GolfLogService {
 
     if (error) {
       throw error;
+    }
+  }
+
+  async saveCourseTeeTimeUrl(courseName: string, teeTimeUrl: string): Promise<void> {
+    const normalizedUrl = teeTimeUrl.trim();
+    if (normalizedUrl) {
+      let parsedUrl: URL;
+      try {
+        parsedUrl = new URL(normalizedUrl);
+      } catch {
+        throw new Error('Enter a valid tee time URL, or leave the field blank to remove it.');
+      }
+      if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
+        throw new Error('Tee time URLs must start with http:// or https://.');
+      }
+    }
+
+    const { data, error } = await (await this.getClient())
+      .from('golf_courses')
+      .update({ tee_time_url: normalizedUrl || null })
+      .eq('name', courseName.trim())
+      .select('name')
+      .maybeSingle();
+
+    if (error) {
+      throw error;
+    }
+    if (!data) {
+      throw new Error('Course configuration was not found. Save its pars before adding a tee time URL.');
     }
   }
 

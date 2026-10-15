@@ -74,18 +74,29 @@ interface ScorecardEntry {
             </label>
           }
         </fieldset>
-        <label class="course-filter">
-          Filter rounds by course
-          <select name="courseFilter" [(ngModel)]="selectedCourse">
-            <option value="">All courses ({{ courses.length }})</option>
-            @for (courseName of courses; track courseName) {
-              <option [value]="courseName">
-                {{ courseName }}{{ isCourseConfigured(courseName) ? '' : ' — Setup needed' }}
-                ({{ countRoundsAt(courseName) }})
-              </option>
-            }
-          </select>
-        </label>
+        <div class="course-filter-row">
+          <label class="course-filter">
+            Filter rounds by course
+            <select name="courseFilter" [(ngModel)]="selectedCourse">
+              <option value="">All courses ({{ courses.length }})</option>
+              @for (courseName of courses; track courseName) {
+                <option [value]="courseName">
+                  {{ courseName }}{{ isCourseConfigured(courseName) ? '' : ' — Setup needed' }}
+                  ({{ countRoundsAt(courseName) }})
+                </option>
+              }
+            </select>
+          </label>
+          @if (selectedCourseTeeTimeUrl; as teeTimeUrl) {
+            <a
+              class="tee-time-button"
+              [href]="teeTimeUrl"
+              target="_blank"
+              rel="noopener noreferrer"
+              [attr.aria-label]="'Book a tee time at ' + selectedCourse"
+            ><span aria-hidden="true">★</span> BOOK TEE TIME</a>
+          }
+        </div>
 
         @if (filteredRounds.length === 0) {
           <p class="log-status">No rounds match these filters.</p>
@@ -531,6 +542,15 @@ export class GolfLogComponent implements OnInit, OnDestroy {
     return this.selectedCourse
       ? this.roundsMatchingPlayers.filter((round) => round.course === this.selectedCourse)
       : this.roundsMatchingPlayers;
+  }
+
+  get selectedCourseTeeTimeUrl(): string | null {
+    if (!this.selectedCourse) {
+      return null;
+    }
+    return this.courseConfigs.find(
+      (course) => course.name.trim().toLocaleLowerCase() === this.selectedCourse.trim().toLocaleLowerCase()
+    )?.teeTimeUrl?.trim() || null;
   }
 
   constructor(private readonly golfLog: GolfLogService) {}

@@ -68,6 +68,7 @@ create table public.golf_log_admins (
 create table public.golf_courses (
   name text primary key check (length(trim(name)) between 1 and 160),
   pars integer[] not null check (public.valid_golf_course_pars(pars)),
+  tee_time_url text,
   background_image_path text,
   background_image_opacity real not null default 0.12
     check (background_image_opacity between 0.03 and 0.5),
