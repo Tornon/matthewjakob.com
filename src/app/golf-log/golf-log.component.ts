@@ -26,19 +26,26 @@ interface ScorecardEntry {
       <a class="back-link" routerLink="/">&larr; Back to home</a>
       <div class="golf-log-heading">
         <h1>Golf Log</h1>
-        @if (canManage) {
-          <button
-            type="button"
-            class="add-round-button"
-            [disabled]="busy"
-            (click)="startAddingRound()"
-          >Add a new round</button>
-        }
+        <div class="golf-log-heading-actions">
+          @if (canManage) {
+            <button
+              type="button"
+              class="add-round-button"
+              [disabled]="busy"
+              (click)="startAddingRound()"
+            >Add a new round</button>
+          }
+        </div>
       </div>
       <p class="intro">A place to keep track of rounds played with friends.</p>
-      <p class="course-details-link">
-        <a routerLink="/golf-courses">Course details &amp; stats</a>
-      </p>
+      <nav class="course-page-links" aria-label="Course pages">
+        <a class="course-details-link" routerLink="/golf-courses">Course details &amp; stats</a>
+        <a
+          class="course-config-button"
+          routerLink="/golf-course-notes"
+          [queryParams]="{ blank: true }"
+        >Course Notes &amp; Configuration</a>
+      </nav>
 
       @if (loading) {
         <p class="log-status" role="status">Loading rounds...</p>
@@ -123,18 +130,7 @@ interface ScorecardEntry {
                       routerLink="/golf-course-notes"
                       [queryParams]="{ course: round.course }"
                     >
-                      <span>Notes &amp; Course Config</span>
-                      <span class="round-course-rating" [attr.aria-label]="courseRatingLabel(round.course)">
-                        @if (courseRatingSummary(round.course); as rating) {
-                          @if (rating.totalRatings > 0) {
-                            <span aria-hidden="true">★</span> {{ formatCourseRating(rating.averageRating) }}
-                          } @else {
-                            <span>No ratings</span>
-                          }
-                        } @else {
-                          <span>Loading rating...</span>
-                        }
-                      </span>
+                      Notes &amp; Course Config
                     </a>
                     @if (!isCourseConfigured(round.course)) {
                       <a
@@ -180,8 +176,22 @@ interface ScorecardEntry {
                   </div>
                 </div>
 
-                <details>
-                  <summary>Scorecards ({{ round.friends.length + 1 }} players)</summary>
+                <div class="round-card-secondary-links">
+                  <details>
+                    <summary>
+                      <span>Scorecards ({{ round.friends.length + 1 }} players)</span>
+                      <span class="round-course-rating" [attr.aria-label]="courseRatingLabel(round.course)">
+                        @if (courseRatingSummary(round.course); as rating) {
+                          @if (rating.totalRatings > 0) {
+                            <span aria-hidden="true">★</span> {{ formatCourseRating(rating.averageRating) }}
+                          } @else {
+                            <span>No ratings</span>
+                          }
+                        } @else {
+                          <span>Loading rating...</span>
+                        }
+                      </span>
+                    </summary>
                   <div class="scorecard-scroll">
                     <table class="scorecard">
                       <caption>{{ roundTitle(round) }} - {{ formatDate(round.date) }}</caption>
@@ -290,7 +300,8 @@ interface ScorecardEntry {
                   @if (hasUnrecordedScorecards(round) || hasUnrecordedSegmentScores(round)) {
                     <p class="scorecard-note">* Totals and nine-hole subtotals include recorded holes only.</p>
                   }
-                </details>
+                  </details>
+                </div>
               </li>
             }
           </ol>

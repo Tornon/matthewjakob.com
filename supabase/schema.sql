@@ -69,6 +69,7 @@ create table public.golf_courses (
   name text primary key check (length(trim(name)) between 1 and 160),
   pars integer[] not null check (public.valid_golf_course_pars(pars)),
   tee_time_url text,
+  scorecard_path text,
   background_image_path text,
   background_image_opacity real not null default 0.12
     check (background_image_opacity between 0.03 and 0.5),
@@ -121,8 +122,24 @@ create table public.golf_rounds (
   unique (played_on, course, starting_hole, total_strokes, hole_strokes)
 );
 
+create table public.poker_sessions (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null default auth.uid() references auth.users (id) on delete cascade,
+  played_on date not null,
+  venue text not null check (length(trim(venue)) between 1 and 160),
+  buy_ins numeric(12, 2) check (buy_ins is null or buy_ins >= 0),
+  winnings numeric(12, 2) check (winnings is null or winnings >= 0),
+  net numeric(12, 2) not null,
+  notes text check (notes is null or length(notes) <= 1000),
+  import_key text,
+  created_at timestamptz not null default now(),
+  unique (user_id, import_key)
+);
+
 create index golf_rounds_played_on_idx
   on public.golf_rounds (played_on desc, created_at desc);
+create index poker_sessions_played_on_idx
+  on public.poker_sessions (played_on desc, created_at desc);
 
 alter table public.golf_log_admins enable row level security;
 alter table public.golf_courses enable row level security;
@@ -130,6 +147,8 @@ alter table public.golf_course_notes enable row level security;
 alter table public.golf_course_ratings enable row level security;
 alter table public.golf_course_holes enable row level security;
 alter table public.golf_rounds enable row level security;
+alter table public.poker_sessions enable row level security;
+revoke all on public.poker_sessions from anon, public;
 grant usage on schema public to anon, authenticated;
 
 create function public.is_golf_log_admin()
@@ -146,11 +165,23 @@ as $$
   );
 $$;
 
+create function public.is_poker_stats_owner()
+returns boolean
+language sql
+stable
+set search_path = ''
+as $$
+  select (select auth.uid()) = 'bcc7a172-3a63-404c-a0f1-af26786ffd96'::uuid;
+$$;
+
 revoke all on function public.is_golf_log_admin() from public;
 grant execute on function public.is_golf_log_admin() to anon, authenticated;
+revoke all on function public.is_poker_stats_owner() from public;
+grant execute on function public.is_poker_stats_owner() to authenticated;
 
 grant select on public.golf_rounds to anon, authenticated;
 grant insert, update, delete on public.golf_rounds to authenticated;
+grant select, insert, delete on public.poker_sessions to authenticated;
 grant select on public.golf_courses to anon, authenticated;
 grant insert, update on public.golf_courses to authenticated;
 grant select on public.golf_course_notes to anon, authenticated;
@@ -268,7 +299,7 @@ values (
   'golf-course-images',
   true,
   5242880,
-  array['image/jpeg', 'image/png', 'image/webp']
+  array['image/jpeg', 'image/png', 'image/webp', 'application/pdf']
 )
 on conflict (id) do update
 set public = excluded.public,
@@ -324,3 +355,21 @@ create policy "Golf log admins can remove rounds"
   for delete
   to authenticated
   using ((select public.is_golf_log_admin()));
+
+create policy "Poker stats owner can read sessions"
+  on public.poker_sessions
+  for select
+  to authenticated
+  using ((select public.is_poker_stats_owner()) and user_id = (select auth.uid()));
+
+create policy "Poker stats owner can add sessions"
+  on public.poker_sessions
+  for insert
+  to authenticated
+  with check ((select public.is_poker_stats_owner()) and user_id = (select auth.uid()));
+
+create policy "Poker stats owner can remove sessions"
+  on public.poker_sessions
+  for delete
+  to authenticated
+  using ((select public.is_poker_stats_owner()) and user_id = (select auth.uid()));

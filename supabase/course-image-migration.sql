@@ -27,7 +27,7 @@ values (
   'golf-course-images',
   true,
   5242880,
-  array['image/jpeg', 'image/png', 'image/webp']
+  array['image/jpeg', 'image/png', 'image/webp', 'application/pdf']
 )
 on conflict (id) do update
 set public = excluded.public,

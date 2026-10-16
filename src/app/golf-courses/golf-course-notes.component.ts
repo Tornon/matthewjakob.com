@@ -29,6 +29,7 @@ import {
           <label class="course-filter">
             Course
             <select name="selectedCourse" [ngModel]="selectedCourse" (ngModelChange)="selectCourse($event)">
+              <option value="">Select a course</option>
               @for (course of courses; track course) {
                 <option [value]="course">{{ course }}</option>
               }
@@ -52,6 +53,8 @@ import {
         <p class="log-status" role="status">Loading course notes...</p>
       } @else if (courses.length === 0) {
         <p class="log-status">No courses are available yet. Add a course configuration below.</p>
+      } @else if (!selectedCourse) {
+        <p class="log-status">No course selected. Choose a course above, or use the configuration form below to add one.</p>
       } @else {
         <section class="course-notes-section" aria-labelledby="course-rating-heading">
           <h2 id="course-rating-heading">{{ selectedCourse }}</h2>
@@ -259,36 +262,6 @@ import {
                 }
               </datalist>
             </label>
-            <label>
-              Holes configured
-              <select
-                name="parHoleCount"
-                [ngModel]="parHoleCount"
-                (ngModelChange)="setParHoleCount($event)"
-              >
-                <option [ngValue]="9">9 holes</option>
-                <option [ngValue]="18">18 holes</option>
-              </select>
-            </label>
-            <fieldset class="par-entry wide-field">
-              <legend>Par for each hole</legend>
-              <div class="hole-entry-grid par-entry-grid">
-                @for (par of pars; track $index; let holeIndex = $index) {
-                  <label>
-                    Hole {{ holeIndex + 1 }}
-                    <input
-                      [name]="'par-' + holeIndex"
-                      type="number"
-                      min="3"
-                      max="6"
-                      step="1"
-                      inputmode="numeric"
-                      [(ngModel)]="pars[holeIndex]"
-                    >
-                  </label>
-                }
-              </div>
-            </fieldset>
           </div>
           @if (configurationCourse; as config) {
             <section class="course-image-settings" aria-labelledby="course-image-heading">
@@ -366,7 +339,90 @@ import {
                 {{ saving ? 'Uploading...' : 'Upload course image' }}
               </button>
             </section>
+            <section class="course-scorecard-settings" aria-labelledby="course-scorecard-heading">
+              <h3 id="course-scorecard-heading">Course scorecard</h3>
+              @if (config.scorecardUrl && config.scorecardPath) {
+                @if (isPdfScorecard(config)) {
+                  <p class="form-help">A PDF scorecard is available for {{ config.name }}.</p>
+                } @else {
+                  <div class="course-scorecard-preview-frame">
+                    <img
+                      class="course-scorecard-preview"
+                      [src]="config.scorecardUrl"
+                      alt="Course scorecard for {{ config.name }}"
+                    >
+                  </div>
+                }
+                <a
+                  class="secondary-button course-scorecard-link"
+                  [href]="config.scorecardUrl"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >View current scorecard</a>
+                <button
+                  type="button"
+                  class="danger-button"
+                  [disabled]="saving"
+                  (click)="removeCourseScorecard(config.name)"
+                >Remove scorecard</button>
+              } @else {
+                <p class="form-help">Upload an image or PDF of this course's scorecard.</p>
+              }
+              <label>
+                Scorecard file (JPEG, PNG, WebP, or PDF; up to 5 MB)
+                <input
+                  name="courseScorecard"
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,application/pdf"
+                  [disabled]="saving"
+                  (change)="selectCourseScorecard($event)"
+                >
+              </label>
+              @if (selectedScorecardFile) {
+                <p class="form-help">Selected: {{ selectedScorecardFile.name }}</p>
+              }
+              <button
+                type="button"
+                [disabled]="saving || !selectedScorecardFile"
+                (click)="uploadCourseScorecard(config.name)"
+              >
+                {{ saving ? 'Uploading...' : 'Upload course scorecard' }}
+              </button>
+            </section>
           }
+          <div class="course-par-settings">
+            <h3>Course pars</h3>
+            <label>
+              Holes configured
+              <select
+                name="parHoleCount"
+                [ngModel]="parHoleCount"
+                (ngModelChange)="setParHoleCount($event)"
+              >
+                <option [ngValue]="9">9 holes</option>
+                <option [ngValue]="18">18 holes</option>
+              </select>
+            </label>
+            <fieldset class="par-entry">
+              <legend>Par for each hole</legend>
+              <div class="hole-entry-grid par-entry-grid">
+                @for (par of pars; track $index; let holeIndex = $index) {
+                  <label>
+                    Hole {{ holeIndex + 1 }}
+                    <input
+                      [name]="'par-' + holeIndex"
+                      type="number"
+                      min="3"
+                      max="6"
+                      step="1"
+                      inputmode="numeric"
+                      [(ngModel)]="pars[holeIndex]"
+                    >
+                  </label>
+                }
+              </div>
+            </fieldset>
+          </div>
           <p class="form-help">
             Enter a par from 3 to 6 for every hole.
             For a 9-hole scorecard on an 18-hole course, choose front or back nine when adding
@@ -424,6 +480,7 @@ export class GolfCourseNotesComponent implements OnInit {
   backgroundImagePositionX = 50;
   backgroundImagePositionY = 50;
   selectedBackgroundFile: File | null = null;
+  selectedScorecardFile: File | null = null;
   teeTimeUrlDraft = '';
   notes: GolfCourseNote[] = [];
   ratingSummary: GolfCourseRatingSummary = { totalRatings: 0, averageRating: 0, myRating: 0 };
@@ -462,6 +519,10 @@ export class GolfCourseNotesComponent implements OnInit {
     return this.selectedConfig?.teeTimeUrl?.trim() || null;
   }
 
+  isPdfScorecard(config: GolfCourse): boolean {
+    return config.scorecardPath?.toLocaleLowerCase().endsWith('.pdf') ?? false;
+  }
+
   get configurationCourse(): GolfCourse | undefined {
     return this.configs.find((course) =>
       course.name.toLocaleLowerCase() === this.configCourseName.trim().toLocaleLowerCase()
@@ -490,7 +551,7 @@ export class GolfCourseNotesComponent implements OnInit {
       const requestedCourse = this.route.snapshot.queryParamMap.get('course');
       this.selectedCourse = this.courses.find(
         (course) => course.toLocaleLowerCase() === requestedCourse?.toLocaleLowerCase()
-      ) ?? this.courses[0] ?? '';
+      ) ?? (this.route.snapshot.queryParamMap.get('blank') === 'true' ? '' : this.courses[0] ?? '');
       if (this.selectedCourse) {
         this.loadConfigurationFields(this.selectedCourse);
         await this.loadSelectedCourse();
@@ -512,6 +573,9 @@ export class GolfCourseNotesComponent implements OnInit {
     this.holeImages = [];
     this.notice = '';
     this.actionError = '';
+    if (!courseName) {
+      return;
+    }
     try {
       await this.loadSelectedCourse();
     } catch (error) {
@@ -616,6 +680,52 @@ export class GolfCourseNotesComponent implements OnInit {
       this.backgroundImagePositionY = savedSettings.positionY;
       this.configs = await this.golfLog.getCourseConfigs();
       this.notice = `Watermark settings saved for ${config.name}.`;
+    });
+  }
+
+  selectCourseScorecard(event: Event): void {
+    const input = event.target;
+    if (!(input instanceof HTMLInputElement)) {
+      return;
+    }
+    const file = input.files?.[0] ?? null;
+    input.value = '';
+    this.actionError = '';
+    if (!file) {
+      return;
+    }
+    if (!['image/jpeg', 'image/png', 'image/webp', 'application/pdf'].includes(file.type)) {
+      this.actionError = 'Choose a JPEG, PNG, WebP, or PDF scorecard.';
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      this.actionError = 'Course scorecards must be 5 MB or smaller.';
+      return;
+    }
+    this.selectedScorecardFile = file;
+  }
+
+  async uploadCourseScorecard(courseName: string): Promise<void> {
+    const file = this.selectedScorecardFile;
+    if (!this.canManage || !this.configurationCourse || !file) {
+      return;
+    }
+    await this.performAction(async () => {
+      await this.golfLog.uploadCourseScorecard(courseName, file);
+      this.configs = await this.golfLog.getCourseConfigs();
+      this.selectedScorecardFile = null;
+      this.notice = `Scorecard uploaded for ${courseName}.`;
+    });
+  }
+
+  async removeCourseScorecard(courseName: string): Promise<void> {
+    if (!this.canManage) {
+      return;
+    }
+    await this.performAction(async () => {
+      await this.golfLog.deleteCourseScorecard(courseName);
+      this.configs = await this.golfLog.getCourseConfigs();
+      this.notice = `Scorecard removed for ${courseName}.`;
     });
   }
 
@@ -775,6 +885,7 @@ export class GolfCourseNotesComponent implements OnInit {
     this.backgroundImagePositionY = config?.backgroundImagePositionY ?? 50;
     this.teeTimeUrlDraft = config?.teeTimeUrl ?? '';
     this.selectedBackgroundFile = null;
+    this.selectedScorecardFile = null;
   }
 
   private async performAction(action: () => Promise<void>): Promise<void> {

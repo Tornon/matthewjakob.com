@@ -37,6 +37,8 @@ export interface GolfCourse {
   backgroundImagePositionX?: number;
   backgroundImagePositionY?: number;
   backgroundImageUrl?: string | null;
+  scorecardPath?: string | null;
+  scorecardUrl?: string | null;
 }
 
 export interface GolfCourseNote {
@@ -335,7 +337,7 @@ export class GolfLogService {
     const { data, error } = await (await this.getClient())
       .from('golf_courses')
       .select(
-        'name, pars, tee_time_url, background_image_path, background_image_opacity, background_image_position_x, background_image_position_y'
+        'name, pars, tee_time_url, background_image_path, background_image_opacity, background_image_position_x, background_image_position_y, scorecard_path'
       )
       .order('name', { ascending: true });
 
@@ -354,6 +356,10 @@ export class GolfLogService {
       backgroundImagePositionY: course.background_image_position_y,
       backgroundImageUrl: course.background_image_path
         ? client.storage.from('golf-course-images').getPublicUrl(course.background_image_path).data.publicUrl
+        : null,
+      scorecardPath: course.scorecard_path,
+      scorecardUrl: course.scorecard_path
+        ? client.storage.from('golf-course-images').getPublicUrl(course.scorecard_path).data.publicUrl
         : null
     }));
   }
@@ -365,6 +371,95 @@ export class GolfLogService {
 
     if (error) {
       throw error;
+    }
+  }
+
+  async uploadCourseScorecard(name: string, file: File): Promise<void> {
+    const client = await this.getClient();
+    const extension = file.type === 'application/pdf'
+      ? 'pdf'
+      : file.type === 'image/jpeg'
+        ? 'jpg'
+        : file.type.slice('image/'.length);
+    const path = `scorecards/${crypto.randomUUID()}.${extension}`;
+    const { error: uploadError } = await client.storage
+      .from('golf-course-images')
+      .upload(path, file, { contentType: file.type, upsert: false });
+
+    if (uploadError) {
+      throw uploadError;
+    }
+
+    const { data: previous, error: readError } = await client
+      .from('golf_courses')
+      .select('scorecard_path')
+      .eq('name', name.trim())
+      .maybeSingle();
+    if (readError || !previous) {
+      const { error: cleanupError } = await client.storage.from('golf-course-images').remove([path]);
+      const reason = readError?.message
+        ?? 'Course configuration was not found. Save its pars before uploading a scorecard.';
+      if (cleanupError) {
+        throw new Error(`${reason} The uploaded file could not be cleaned up: ${cleanupError.message}`);
+      }
+      throw new Error(reason);
+    }
+
+    const { data, error: updateError } = await client
+      .from('golf_courses')
+      .update({ scorecard_path: path })
+      .eq('name', name.trim())
+      .select('scorecard_path')
+      .maybeSingle();
+
+    if (updateError || !data) {
+      const { error: cleanupError } = await client.storage.from('golf-course-images').remove([path]);
+      const reason = updateError?.message ?? 'Course scorecard could not be saved.';
+      if (cleanupError) {
+        throw new Error(`${reason} The uploaded file could not be cleaned up: ${cleanupError.message}`);
+      }
+      throw new Error(reason);
+    }
+
+    if (previous.scorecard_path) {
+      const { error: removeError } = await client.storage
+        .from('golf-course-images')
+        .remove([previous.scorecard_path]);
+      if (removeError) {
+        throw new Error(`The new scorecard was saved, but the previous file could not be removed: ${removeError.message}`);
+      }
+    }
+  }
+
+  async deleteCourseScorecard(name: string): Promise<void> {
+    const client = await this.getClient();
+    const { data: previous, error: readError } = await client
+      .from('golf_courses')
+      .select('scorecard_path')
+      .eq('name', name.trim())
+      .maybeSingle();
+    if (readError) {
+      throw readError;
+    }
+    if (!previous?.scorecard_path) {
+      throw new Error('No course scorecard was found to remove.');
+    }
+
+    const { data, error: updateError } = await client
+      .from('golf_courses')
+      .update({ scorecard_path: null })
+      .eq('name', name.trim())
+      .select('name')
+      .maybeSingle();
+    if (updateError || !data) {
+      throw updateError ?? new Error('Course scorecard could not be removed.');
+    }
+
+    const { error: removeError } = await client.storage
+      .from('golf-course-images')
+      .remove([previous.scorecard_path]);
+    if (removeError) {
+      throw new Error(`The course scorecard record was removed, but its file could not be deleted: ${removeError.message}`);
     }
   }
 

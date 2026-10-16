@@ -1,10 +1,11 @@
 import { Component } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { PokerStatsHomeLinkComponent } from '../poker-stats/poker-stats-home-link.component';
 
 @Component({
   selector: 'app-home',
   standalone: true,
-  imports: [RouterLink],
+  imports: [RouterLink, PokerStatsHomeLinkComponent],
   template: `
     <div class="glow" aria-hidden="true"></div>
 
@@ -18,6 +19,9 @@ import { RouterLink } from '@angular/router';
           <h3>Golf Log</h3>
           <p>A place to keep track of rounds played with friends.</p>
         </a>
+        @defer (on idle) {
+          <app-poker-stats-home-link />
+        }
       </section>
     </main>
   `
