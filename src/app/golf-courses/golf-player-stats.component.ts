@@ -90,26 +90,52 @@ interface HoleAverage {
         </div>
 
         <section class="player-worst-section" aria-labelledby="worst-holes-heading">
-          <h2 id="worst-holes-heading">20 worst individual holes</h2>
+          <h2 id="worst-holes-heading">Worst individual holes</h2>
           <p class="player-stats-help">
-            Ranked from most strokes over par. Only recorded scores with a configured par are included.
+            Ranked by strokes over par. Only recorded scores with a configured par are included.
           </p>
-          @if (worstHoles.length === 0) {
-            <p class="log-status">No recorded holes with configured pars for this player.</p>
-          } @else {
-            <ol class="worst-hole-list">
-              @for (result of worstHoles; track $index) {
-                <li>
-                  <span class="worst-hole-rank">#{{ $index + 1 }}</span>
-                  <strong class="worst-hole-difference">{{ formatToPar(result.toPar) }}</strong>
-                  <span class="worst-hole-detail">
-                    <strong>{{ result.course }} · Hole {{ result.hole }}</strong>
-                    <span>{{ formatDate(result.date) }} · {{ result.strokes }} strokes on par {{ result.par }}</span>
-                  </span>
-                </li>
+          <div class="player-worst-grid">
+            <section class="player-worst-period" aria-labelledby="worst-all-time-heading">
+              <h3 id="worst-all-time-heading">10 worst · all time</h3>
+              @if (worstHolesAllTime.length === 0) {
+                <p class="log-status">No recorded holes with configured pars for this player.</p>
+              } @else {
+                <ol class="worst-hole-list">
+                  @for (result of worstHolesAllTime; track $index) {
+                    <li>
+                      <span class="worst-hole-rank">#{{ $index + 1 }}</span>
+                      <strong class="worst-hole-difference">{{ formatToPar(result.toPar) }}</strong>
+                      <span class="worst-hole-detail">
+                        <strong>{{ result.course }} · Hole {{ result.hole }}</strong>
+                        <span>{{ formatDate(result.date) }} · {{ result.strokes }} strokes on par {{ result.par }}</span>
+                      </span>
+                    </li>
+                  }
+                </ol>
               }
-            </ol>
-          }
+            </section>
+
+            <section class="player-worst-period" aria-labelledby="worst-recent-heading">
+              <h3 id="worst-recent-heading">10 worst · last 12 months</h3>
+              <p class="player-stats-help">Since {{ formatDate(lastTwelveMonthsStart) }}</p>
+              @if (worstHolesLastTwelveMonths.length === 0) {
+                <p class="log-status">No recorded holes with configured pars in this period.</p>
+              } @else {
+                <ol class="worst-hole-list">
+                  @for (result of worstHolesLastTwelveMonths; track $index) {
+                    <li>
+                      <span class="worst-hole-rank">#{{ $index + 1 }}</span>
+                      <strong class="worst-hole-difference">{{ formatToPar(result.toPar) }}</strong>
+                      <span class="worst-hole-detail">
+                        <strong>{{ result.course }} · Hole {{ result.hole }}</strong>
+                        <span>{{ formatDate(result.date) }} · {{ result.strokes }} strokes on par {{ result.par }}</span>
+                      </span>
+                    </li>
+                  }
+                </ol>
+              }
+            </section>
+          </div>
         </section>
       }
     </main>
@@ -128,16 +154,46 @@ export class GolfPlayerStatsComponent implements OnInit {
     private readonly route: ActivatedRoute
   ) {}
 
-  get worstHoles(): HoleResult[] {
-    return this.holeResults
-      .sort((left, right) =>
-        right.toPar - left.toPar ||
-        right.strokes - left.strokes ||
-        right.date.localeCompare(left.date) ||
-        left.course.localeCompare(right.course) ||
-        left.hole - right.hole
-      )
-      .slice(0, 20);
+  get worstHolesAllTime(): HoleResult[] {
+    return this.rankWorstHoles(this.holeResults).slice(0, 10);
+  }
+
+  get worstHolesLastTwelveMonths(): HoleResult[] {
+    const today = this.todayDate;
+    const cutoff = this.lastTwelveMonthsStart;
+    return this.rankWorstHoles(this.holeResults.filter(
+      (result) => result.date >= cutoff && result.date <= today
+    )).slice(0, 10);
+  }
+
+  get lastTwelveMonthsStart(): string {
+    const date = new Date();
+    date.setHours(12, 0, 0, 0);
+    const dayOfMonth = date.getDate();
+    const month = date.getMonth();
+    date.setDate(1);
+    date.setFullYear(date.getFullYear() - 1);
+    date.setMonth(month);
+    date.setDate(Math.min(dayOfMonth, new Date(date.getFullYear(), month + 1, 0).getDate()));
+    return this.formatLocalDate(date);
+  }
+
+  private get todayDate(): string {
+    return this.formatLocalDate(new Date());
+  }
+
+  private rankWorstHoles(results: HoleResult[]): HoleResult[] {
+    return results.sort((left, right) =>
+      right.toPar - left.toPar ||
+      right.strokes - left.strokes ||
+      right.date.localeCompare(left.date) ||
+      left.course.localeCompare(right.course) ||
+      left.hole - right.hole
+    );
+  }
+
+  private formatLocalDate(date: Date): string {
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
   }
 
   get bestAverages(): HoleAverage[] {

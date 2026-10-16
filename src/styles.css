@@ -939,8 +939,15 @@ a.course-setup-badge:focus-visible {
   margin-top: 24px;
 }
 
+.player-worst-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
 .player-stats-page > section,
-.player-average-grid > section {
+.player-average-grid > section,
+.player-worst-period {
   display: grid;
   gap: 14px;
   margin-top: 24px;
@@ -950,7 +957,8 @@ a.course-setup-badge:focus-visible {
   background: #1c1017;
 }
 
-.player-average-grid > section {
+.player-average-grid > section,
+.player-worst-period {
   margin-top: 0;
 }
 
@@ -962,6 +970,11 @@ a.course-setup-badge:focus-visible {
 .player-average-grid > section h2 {
   color: #fecaca;
   font-size: 1.4rem;
+}
+
+.player-worst-period h3 {
+  color: #fecaca;
+  font-size: 1.1rem;
 }
 
 .player-stats-help {
@@ -1599,8 +1612,14 @@ a.course-setup-badge:focus-visible {
     gap: 14px;
   }
 
+  .player-worst-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 14px;
+  }
+
   .player-stats-page > section,
-  .player-average-grid > section {
+  .player-average-grid > section,
+  .player-worst-period {
     padding: 14px;
   }
 
