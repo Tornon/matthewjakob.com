@@ -33,5 +33,11 @@ export const routes: Routes = [
       import('./poker-stats/poker-stats.component').then((module) => module.PokerStatsComponent),
     title: 'Poker Stats'
   },
+  {
+    path: 'fantasy-baseball',
+    loadComponent: () =>
+      import('./fantasy-baseball/fantasy-baseball.component').then((module) => module.FantasyBaseballComponent),
+    title: 'Fantasy Baseball Rankings'
+  },
   { path: '**', redirectTo: '' }
 ];

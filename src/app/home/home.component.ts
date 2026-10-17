@@ -19,6 +19,11 @@ import { PokerStatsHomeLinkComponent } from '../poker-stats/poker-stats-home-lin
           <h3>Golf Log</h3>
           <p>A place to keep track of rounds played with friends.</p>
         </a>
+        <a class="page-card fantasy-baseball-card" routerLink="/fantasy-baseball">
+          <span class="page-card-label">Fantasy Baseball</span>
+          <h3>Player Rankings</h3>
+          <p>Rank players, manage team lineups, and track season stats.</p>
+        </a>
         @defer (on idle) {
           <app-poker-stats-home-link />
         }
