@@ -1,4 +1,4 @@
-import { Component, OnDestroy, OnInit } from '@angular/core';
+import { Component, ElementRef, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import type { Session } from '@supabase/supabase-js';
@@ -351,8 +351,48 @@ interface ScorecardEntry {
             </button>
           </div>
 
-          <form id="round-editor" class="admin-form" (ngSubmit)="addRound()">
-            <h3>{{ editRoundId ? 'Edit round' : 'Add a round' }}</h3>
+          <section class="admin-form import-form">
+            <h3>Import rounds</h3>
+            <p>
+              Select your original 18Birdies JSON export or a sanitized golf rounds JSON file.
+              Only names and round scorecards are uploaded; account and social data stay private.
+            </p>
+            <input
+              type="file"
+              accept=".json,application/json"
+              [disabled]="busy"
+              (change)="importRounds($event)"
+            >
+          </section>
+        } @else {
+          <p class="log-status">
+            Signed in, but this account is not authorized to manage rounds.
+          </p>
+          <button type="button" class="secondary-button" [disabled]="busy" (click)="signOut()">
+            Sign out
+          </button>
+        }
+      </section>
+
+      @if (canManage) {
+        <dialog
+          #roundDialog
+          class="round-editor-dialog"
+          aria-labelledby="round-editor-heading"
+          (click)="closeRoundDialogFromBackdrop($event)"
+          (cancel)="cancelRoundDialog($event)"
+        >
+          <form id="round-editor" class="admin-form round-editor-form" (ngSubmit)="addRound()">
+            <div class="round-editor-heading">
+              <h2 id="round-editor-heading">{{ editRoundId ? 'Edit round' : 'Add a round' }}</h2>
+              <button
+                type="button"
+                class="round-dialog-close"
+                [disabled]="busy"
+                aria-label="Close round editor"
+                (click)="cancelEditing()"
+              >×</button>
+            </div>
             <div class="form-grid">
               <label>
                 Date
@@ -465,45 +505,22 @@ interface ScorecardEntry {
                   {{ editRoundId ? 'Save changes' : 'Add round' }}
                 }
               </button>
-              @if (editRoundId) {
-                <button
-                  type="button"
-                  class="secondary-button"
-                  [disabled]="busy"
-                  (click)="cancelEditing()"
-                >
-                  Cancel
-                </button>
-              }
+              <button
+                type="button"
+                class="secondary-button"
+                [disabled]="busy"
+                (click)="cancelEditing()"
+              >Cancel</button>
             </div>
           </form>
-
-          <section class="admin-form import-form">
-            <h3>Import rounds</h3>
-            <p>
-              Select your original 18Birdies JSON export or a sanitized golf rounds JSON file.
-              Only names and round scorecards are uploaded; account and social data stay private.
-            </p>
-            <input
-              type="file"
-              accept=".json,application/json"
-              [disabled]="busy"
-              (change)="importRounds($event)"
-            >
-          </section>
-        } @else {
-          <p class="log-status">
-            Signed in, but this account is not authorized to manage rounds.
-          </p>
-          <button type="button" class="secondary-button" [disabled]="busy" (click)="signOut()">
-            Sign out
-          </button>
-        }
-      </section>
+        </dialog>
+      }
     </main>
   `
 })
 export class GolfLogComponent implements OnInit, OnDestroy {
+  @ViewChild('roundDialog') private roundDialog?: ElementRef<HTMLDialogElement>;
+
   rounds: GolfRound[] = [];
   courseConfigs: GolfCourse[] = [];
   courseRatingSummaries: Record<string, GolfCourseRatingSummary> = {};
@@ -990,29 +1007,46 @@ export class GolfLogComponent implements OnInit, OnDestroy {
     ];
     this.notice = `Editing ${round.course} (${this.formatDate(round.date)}). Update the form below and save.`;
     this.authError = '';
-    document.getElementById('round-editor')?.scrollIntoView({
-      behavior: 'smooth',
-      block: 'start'
-    });
+    this.openRoundDialog();
   }
 
   startAddingRound(): void {
     this.cancelEditing();
+    this.roundDate = this.localDate();
     this.authError = '';
     this.notice = '';
-    document.getElementById('round-editor')?.scrollIntoView({
-      behavior: 'smooth',
-      block: 'start'
-    });
+    this.openRoundDialog();
   }
 
   cancelEditing(): void {
+    const dialog = this.roundDialog?.nativeElement;
+    if (dialog?.open) {
+      dialog.close();
+    }
     this.editRoundId = null;
     this.roundDate = '';
     this.course = '';
     this.startingHole = 1;
     this.scorecardHoleCount = 18;
     this.scorecardPlayers = [this.createEmptyScorecard()];
+  }
+
+  cancelRoundDialog(event: Event): void {
+    event.preventDefault();
+    this.cancelEditing();
+  }
+
+  closeRoundDialogFromBackdrop(event: MouseEvent): void {
+    if (event.target === event.currentTarget) {
+      this.cancelEditing();
+    }
+  }
+
+  private openRoundDialog(): void {
+    const dialog = this.roundDialog?.nativeElement;
+    if (dialog && !dialog.open) {
+      dialog.showModal();
+    }
   }
 
   private async updateSession(session: Session | null): Promise<void> {
@@ -1114,6 +1148,11 @@ export class GolfLogComponent implements OnInit, OnDestroy {
       friends: scorecards.slice(1).map(({ name, holes }) => ({ name, holes })),
       startingHole: player.holes.length === 9 ? this.startingHole : 1
     };
+  }
+
+  private localDate(): string {
+    const today = new Date();
+    return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
   }
 
   private parseScorecards(): { name: string; holes: (number | null)[] }[] {

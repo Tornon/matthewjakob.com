@@ -351,6 +351,58 @@ a.course-setup-badge:focus-visible {
   font-size: 1.4rem;
 }
 
+.round-editor-dialog {
+  width: min(960px, calc(100% - 24px));
+  max-height: calc(100dvh - 32px);
+  margin: auto;
+  overflow-y: auto;
+  border: 1px solid #475569;
+  border-radius: 14px;
+  background: #0f172a;
+  color: #e2e8f0;
+}
+
+.round-editor-dialog::backdrop {
+  background: rgb(2 6 23 / 75%);
+  backdrop-filter: blur(3px);
+}
+
+.round-editor-form {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.round-editor-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.round-editor-heading h2 {
+  font-size: 1.4rem;
+}
+
+.round-dialog-close {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border: 1px solid #475569;
+  border-radius: 7px;
+  background: #0f172a;
+  color: #e2e8f0;
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.round-dialog-close:disabled {
+  cursor: wait;
+  opacity: .6;
+}
+
 .admin-form {
   display: grid;
   gap: 14px;
