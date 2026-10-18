@@ -1199,6 +1199,150 @@ a.course-setup-badge:focus-visible {
   font-size: 1.4rem;
 }
 
+.course-gallery {
+  display: grid;
+  gap: 14px;
+}
+
+.course-gallery-viewer {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
+  align-items: center;
+  gap: 12px;
+}
+
+.course-gallery-slide {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  margin: 0;
+}
+
+.course-gallery-slide img {
+  display: block;
+  width: 100%;
+  max-height: min(65vh, 620px);
+  object-fit: contain;
+  border: 1px solid #475569;
+  border-radius: 10px;
+  background: #0f172a;
+}
+
+.course-gallery-slide figcaption {
+  color: #cbd5e1;
+  text-align: center;
+  line-height: 1.5;
+}
+
+.course-gallery-arrow {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 52px;
+  border: 1px solid #475569;
+  border-radius: 8px;
+  background: #0f172a;
+  color: #e2e8f0;
+  font-size: 1.5rem;
+  cursor: pointer;
+}
+
+.course-gallery-arrow:disabled {
+  cursor: default;
+  opacity: .4;
+}
+
+.course-gallery-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: #94a3b8;
+}
+
+.course-gallery-thumbnails {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 2px 2px 8px;
+}
+
+.course-gallery-thumbnails button {
+  flex: 0 0 84px;
+  width: 84px;
+  height: 64px;
+  overflow: hidden;
+  border: 2px solid #475569;
+  border-radius: 6px;
+  background: #0f172a;
+  cursor: pointer;
+}
+
+.course-gallery-thumbnails button.selected {
+  border-color: #38bdf8;
+}
+
+.course-gallery-thumbnails img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.course-gallery-upload {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  background: #0f172a;
+}
+
+.course-gallery-upload label {
+  display: grid;
+  gap: 8px;
+  color: #cbd5e1;
+  font-size: .9rem;
+}
+
+.course-gallery-upload input {
+  width: 100%;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid #475569;
+  border-radius: 7px;
+  background: #0b1220;
+  color: #e2e8f0;
+  font: inherit;
+}
+
+.course-gallery-upload button {
+  width: fit-content;
+  padding: 11px 16px;
+  border: 0;
+  border-radius: 7px;
+  background: #38bdf8;
+  color: #0f172a;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.course-gallery-upload button:disabled {
+  cursor: wait;
+  opacity: .6;
+}
+
+.course-gallery-selected-file {
+  grid-column: 1 / -1;
+  color: #94a3b8;
+  font-size: .9rem;
+  overflow-wrap: anywhere;
+}
+
 .rating-stars,
 .rating-picker {
   display: inline-flex;
@@ -1292,19 +1436,28 @@ a.course-setup-badge:focus-visible {
   place-items: center;
   border: 1px solid #475569;
   border-radius: 6px;
-  background: #0f172a;
-  color: #cbd5e1;
+  background: #450a0a;
+  border-color: #991b1b;
+  color: #f87171;
   font: inherit;
   font-weight: 700;
   cursor: pointer;
   scroll-snap-align: center;
 }
 
-.hole-selector button:hover,
+.hole-selector button.has-photo {
+  border-color: #166534;
+  background: #052e16;
+  color: #4ade80;
+}
+
+.hole-selector button:hover {
+  filter: brightness(1.2);
+}
+
 .hole-selector button.selected {
   border-color: #38bdf8;
-  background: #0c4a6e;
-  color: #e0f2fe;
+  box-shadow: 0 0 0 2px #38bdf855;
 }
 
 .hole-detail-navigation {
@@ -1657,6 +1810,24 @@ a.course-setup-badge:focus-visible {
 
   .hole-photo-upload {
     max-width: none;
+  }
+
+  .course-gallery-viewer {
+    grid-template-columns: 34px minmax(0, 1fr) 34px;
+    gap: 6px;
+  }
+
+  .course-gallery-arrow {
+    width: 34px;
+    height: 44px;
+  }
+
+  .course-gallery-upload {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .course-gallery-selected-file {
+    grid-column: 1;
   }
 
   .player-average-grid {

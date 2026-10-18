@@ -61,6 +61,15 @@ export interface GolfCourseHoleImage {
   imageUrl: string;
 }
 
+export interface GolfCourseGalleryImage {
+  id: string;
+  courseName: string;
+  imagePath: string;
+  imageUrl: string;
+  caption: string | null;
+  createdAt: string;
+}
+
 export interface GolfFriendScore {
   name: string;
   holes: (number | null)[];
@@ -678,6 +687,83 @@ export class GolfLogService {
       .remove([data.image_path]);
     if (removeError) {
       throw new Error(`The hole photo record was removed, but its file could not be deleted: ${removeError.message}`);
+    }
+  }
+
+  async getCourseGalleryImages(courseName: string): Promise<GolfCourseGalleryImage[]> {
+    const { data, error } = await (await this.getClient())
+      .from('golf_course_gallery')
+      .select('id, course_name, image_path, caption, created_at')
+      .eq('course_name', courseName)
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      throw error;
+    }
+
+    const client = await this.getClient();
+    return data.map((item) => ({
+      id: item.id,
+      courseName: item.course_name,
+      imagePath: item.image_path,
+      imageUrl: client.storage
+        .from('golf-course-images')
+        .getPublicUrl(decodeURIComponent(item.image_path))
+        .data.publicUrl,
+      caption: item.caption,
+      createdAt: item.created_at
+    }));
+  }
+
+  async uploadCourseGalleryImage(courseName: string, file: File, caption: string): Promise<void> {
+    const client = await this.getClient();
+    const extension = file.type === 'image/jpeg' ? 'jpg' : file.type.slice('image/'.length);
+    const path = `gallery/${crypto.randomUUID()}.${extension}`;
+    const { error: uploadError } = await client.storage
+      .from('golf-course-images')
+      .upload(path, file, { contentType: file.type, upsert: false });
+
+    if (uploadError) {
+      throw uploadError;
+    }
+
+    const { error: saveError } = await client
+      .from('golf_course_gallery')
+      .insert({
+        course_name: courseName,
+        image_path: path,
+        caption: caption.trim() || null
+      });
+    if (saveError) {
+      const { error: cleanupError } = await client.storage.from('golf-course-images').remove([path]);
+      if (cleanupError) {
+        throw new Error(`${saveError.message} The uploaded image could not be cleaned up: ${cleanupError.message}`);
+      }
+      throw saveError;
+    }
+  }
+
+  async deleteCourseGalleryImage(imageId: string): Promise<void> {
+    const client = await this.getClient();
+    const { data, error } = await client
+      .from('golf_course_gallery')
+      .delete()
+      .eq('id', imageId)
+      .select('image_path')
+      .maybeSingle();
+
+    if (error) {
+      throw error;
+    }
+    if (!data) {
+      throw new Error('The course gallery image could not be found or removed.');
+    }
+
+    const { error: removeError } = await client.storage
+      .from('golf-course-images')
+      .remove([data.image_path]);
+    if (removeError) {
+      throw new Error(`The gallery image record was removed, but its file could not be deleted: ${removeError.message}`);
     }
   }
 

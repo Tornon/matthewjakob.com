@@ -106,6 +106,17 @@ create table public.golf_course_holes (
   primary key (course_name, hole_number)
 );
 
+create table public.golf_course_gallery (
+  id uuid primary key default gen_random_uuid(),
+  course_name text not null check (length(trim(course_name)) between 1 and 160),
+  image_path text not null unique,
+  caption text check (caption is null or length(caption) <= 240),
+  created_at timestamptz not null default now()
+);
+
+create index golf_course_gallery_course_created_idx
+  on public.golf_course_gallery (course_name, created_at, id);
+
 create table public.golf_rounds (
   id uuid primary key default gen_random_uuid(),
   played_on date not null,
@@ -204,6 +215,7 @@ alter table public.golf_courses enable row level security;
 alter table public.golf_course_notes enable row level security;
 alter table public.golf_course_ratings enable row level security;
 alter table public.golf_course_holes enable row level security;
+alter table public.golf_course_gallery enable row level security;
 alter table public.golf_rounds enable row level security;
 alter table public.poker_sessions enable row level security;
 alter table public.fantasy_baseball_players enable row level security;
@@ -271,6 +283,8 @@ grant select on public.golf_course_ratings to authenticated;
 grant insert, update on public.golf_course_ratings to authenticated;
 grant select on public.golf_course_holes to anon, authenticated;
 grant insert, update, delete on public.golf_course_holes to authenticated;
+grant select on public.golf_course_gallery to anon, authenticated;
+grant insert, delete on public.golf_course_gallery to authenticated;
 
 create policy "Golf course notes are publicly readable"
   on public.golf_course_notes
@@ -330,6 +344,24 @@ create policy "Golf log admins can update course hole photos"
 
 create policy "Golf log admins can remove course hole photos"
   on public.golf_course_holes
+  for delete
+  to authenticated
+  using ((select public.is_golf_log_admin()));
+
+create policy "Golf course gallery is publicly readable"
+  on public.golf_course_gallery
+  for select
+  to anon, authenticated
+  using (true);
+
+create policy "Golf log admins can add course gallery photos"
+  on public.golf_course_gallery
+  for insert
+  to authenticated
+  with check ((select public.is_golf_log_admin()));
+
+create policy "Golf log admins can remove course gallery photos"
+  on public.golf_course_gallery
   for delete
   to authenticated
   using ((select public.is_golf_log_admin()));

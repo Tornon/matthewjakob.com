@@ -4,6 +4,7 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import {
   GolfLogService,
   type GolfCourse,
+  type GolfCourseGalleryImage,
   type GolfCourseHoleImage,
   type GolfCourseNote,
   type GolfCourseRatingSummary,
@@ -130,6 +131,97 @@ import {
           }
         </section>
 
+        <section class="course-notes-section" aria-labelledby="course-gallery-heading">
+          <h2 id="course-gallery-heading">Course photos</h2>
+          <p class="form-help">Photos of the food, facilities, clubhouse, and other course highlights.</p>
+          @if (galleryImages.length === 0) {
+            <p class="form-help">No course photos have been added yet.</p>
+          } @else if (currentGalleryImage; as image) {
+            <div class="course-gallery">
+              <div class="course-gallery-viewer">
+                <button
+                  type="button"
+                  class="course-gallery-arrow"
+                  [disabled]="galleryImages.length < 2"
+                  aria-label="Previous course photo"
+                  (click)="moveGallery(-1)"
+                >←</button>
+                <figure class="course-gallery-slide">
+                  <img [src]="image.imageUrl" [alt]="image.caption || 'Photo of ' + selectedCourse">
+                  @if (image.caption) {
+                    <figcaption>{{ image.caption }}</figcaption>
+                  }
+                </figure>
+                <button
+                  type="button"
+                  class="course-gallery-arrow"
+                  [disabled]="galleryImages.length < 2"
+                  aria-label="Next course photo"
+                  (click)="moveGallery(1)"
+                >→</button>
+              </div>
+              <div class="course-gallery-footer">
+                <span aria-live="polite">Photo {{ galleryIndex + 1 }} of {{ galleryImages.length }}</span>
+                @if (canManage) {
+                  <button
+                    type="button"
+                    class="danger-button"
+                    [disabled]="saving"
+                    (click)="removeGalleryImage(image)"
+                  >Remove photo</button>
+                }
+              </div>
+              @if (galleryImages.length > 1) {
+                <div class="course-gallery-thumbnails" aria-label="Choose a course photo">
+                  @for (galleryImage of galleryImages; track galleryImage.id; let index = $index) {
+                    <button
+                      type="button"
+                      [class.selected]="galleryIndex === index"
+                      [attr.aria-label]="'Show course photo ' + (index + 1) + (galleryImage.caption ? ': ' + galleryImage.caption : '')"
+                      [attr.aria-current]="galleryIndex === index ? 'true' : null"
+                      (click)="selectGalleryImage(index)"
+                    >
+                      <img [src]="galleryImage.imageUrl" alt="">
+                    </button>
+                  }
+                </div>
+              }
+            </div>
+          }
+          @if (canManage) {
+            <div class="course-gallery-upload">
+              <label>
+                Add a course photo (JPEG, PNG, or WebP; up to 5 MB)
+                <input
+                  name="course-gallery-file"
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  [disabled]="saving"
+                  (change)="selectGalleryPhoto($event)"
+                >
+              </label>
+              <label>
+                Caption (optional)
+                <input
+                  name="course-gallery-caption"
+                  type="text"
+                  maxlength="240"
+                  [disabled]="saving"
+                  [(ngModel)]="galleryCaptionDraft"
+                >
+              </label>
+              <button
+                type="button"
+                [disabled]="saving || !selectedGalleryFile"
+                (click)="uploadGalleryPhoto()"
+              >{{ saving ? 'Uploading…' : 'Upload photo' }}</button>
+              @if (selectedGalleryFile) {
+                <span class="course-gallery-selected-file">{{ selectedGalleryFile.name }}</span>
+              }
+            </div>
+          }
+        </section>
+
         <section class="course-notes-section hole-notes-section" aria-labelledby="hole-notes-heading">
           <h2 id="hole-notes-heading">Hole-by-hole notes</h2>
           <p class="form-help">
@@ -141,7 +233,10 @@ import {
               <button
                 type="button"
                 [class.selected]="selectedHole === hole"
+                [class.has-photo]="!!holeImage(hole)"
+                [class.no-photo]="!holeImage(hole)"
                 [attr.aria-current]="selectedHole === hole ? 'true' : null"
+                [attr.aria-label]="'Hole ' + hole + (holeImage(hole) ? ', photo available' : ', no photo')"
                 (click)="selectHole(hole)"
               >{{ hole }}</button>
             }
@@ -485,6 +580,10 @@ export class GolfCourseNotesComponent implements OnInit {
   notes: GolfCourseNote[] = [];
   ratingSummary: GolfCourseRatingSummary = { totalRatings: 0, averageRating: 0, myRating: 0 };
   holeImages: GolfCourseHoleImage[] = [];
+  galleryImages: GolfCourseGalleryImage[] = [];
+  selectedGalleryFile: File | null = null;
+  galleryCaptionDraft = '';
+  galleryIndex = 0;
   selectedCourse = '';
   selectedHole = 1;
   loading = true;
@@ -517,6 +616,10 @@ export class GolfCourseNotesComponent implements OnInit {
 
   get selectedCourseTeeTimeUrl(): string | null {
     return this.selectedConfig?.teeTimeUrl?.trim() || null;
+  }
+
+  get currentGalleryImage(): GolfCourseGalleryImage | undefined {
+    return this.galleryImages[this.galleryIndex];
   }
 
   isPdfScorecard(config: GolfCourse): boolean {
@@ -571,6 +674,10 @@ export class GolfCourseNotesComponent implements OnInit {
     this.notes = [];
     this.ratingSummary = { totalRatings: 0, averageRating: 0, myRating: 0 };
     this.holeImages = [];
+    this.galleryImages = [];
+    this.galleryIndex = 0;
+    this.selectedGalleryFile = null;
+    this.galleryCaptionDraft = '';
     this.notice = '';
     this.actionError = '';
     if (!courseName) {
@@ -774,6 +881,77 @@ export class GolfCourseNotesComponent implements OnInit {
     return this.holeImages.find((image) => image.holeNumber === holeNumber);
   }
 
+  moveGallery(direction: -1 | 1): void {
+    if (this.galleryImages.length < 2) {
+      return;
+    }
+    this.galleryIndex = (this.galleryIndex + direction + this.galleryImages.length) % this.galleryImages.length;
+  }
+
+  selectGalleryImage(index: number): void {
+    if (index >= 0 && index < this.galleryImages.length) {
+      this.galleryIndex = index;
+    }
+  }
+
+  selectGalleryPhoto(event: Event): void {
+    const input = event.target;
+    if (!(input instanceof HTMLInputElement)) {
+      return;
+    }
+    const file = input.files?.[0] ?? null;
+    input.value = '';
+    this.actionError = '';
+    if (!file) {
+      return;
+    }
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      this.actionError = 'Choose a JPEG, PNG, or WebP image.';
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      this.actionError = 'Course photos must be 5 MB or smaller.';
+      return;
+    }
+    this.selectedGalleryFile = file;
+  }
+
+  async uploadGalleryPhoto(): Promise<void> {
+    const courseName = this.selectedCourse;
+    const file = this.selectedGalleryFile;
+    if (!this.canManage || !courseName || !file) {
+      return;
+    }
+    await this.performAction(async () => {
+      await this.golfLog.uploadCourseGalleryImage(
+        courseName,
+        file,
+        this.galleryCaptionDraft
+      );
+      this.galleryImages = await this.golfLog.getCourseGalleryImages(courseName);
+      this.galleryIndex = this.galleryImages.length - 1;
+      this.selectedGalleryFile = null;
+      this.galleryCaptionDraft = '';
+      this.notice = `Photo added to the ${courseName} gallery.`;
+    });
+  }
+
+  async removeGalleryImage(image: GolfCourseGalleryImage): Promise<void> {
+    if (!this.canManage) {
+      return;
+    }
+    const courseName = this.selectedCourse;
+    const removedIndex = this.galleryImages.findIndex((item) => item.id === image.id);
+    await this.performAction(async () => {
+      await this.golfLog.deleteCourseGalleryImage(image.id);
+      this.galleryImages = this.galleryImages.filter((item) => item.id !== image.id);
+      this.galleryIndex = this.galleryImages.length === 0
+        ? 0
+        : Math.min(removedIndex, this.galleryImages.length - 1);
+      this.notice = `Photo removed from the ${courseName} gallery.`;
+    });
+  }
+
   async saveRating(): Promise<void> {
     if (!this.canManage || this.ratingDraft < 1 || this.ratingDraft > 5) {
       return;
@@ -860,14 +1038,17 @@ export class GolfCourseNotesComponent implements OnInit {
   }
 
   private async loadSelectedCourse(): Promise<void> {
-    const [notes, ratingSummary, images] = await Promise.all([
+    const [notes, ratingSummary, images, galleryImages] = await Promise.all([
       this.golfLog.getCourseNotes(this.selectedCourse),
       this.golfLog.getCourseRatingSummary(this.selectedCourse),
-      this.golfLog.getCourseHoleImages(this.selectedCourse)
+      this.golfLog.getCourseHoleImages(this.selectedCourse),
+      this.golfLog.getCourseGalleryImages(this.selectedCourse)
     ]);
     this.notes = notes;
     this.ratingSummary = ratingSummary;
     this.holeImages = images;
+    this.galleryImages = galleryImages;
+    this.galleryIndex = 0;
     this.ratingDraft = ratingSummary.myRating;
   }
 
@@ -903,17 +1084,22 @@ export class GolfCourseNotesComponent implements OnInit {
   }
 
   private describeError(error: unknown): string {
-    if (error instanceof Error) {
-      return error.message;
-    }
-    if (
+    const message = error instanceof Error
+      ? error.message
+      : (
       typeof error === 'object' &&
       error !== null &&
       'message' in error &&
       typeof error.message === 'string'
-    ) {
-      return error.message;
+        ? error.message
+        : null
+      );
+    if (!message) {
+      return 'An unexpected error occurred.';
     }
-    return 'An unexpected error occurred.';
+    if (message.includes("Could not find the table 'public.golf_course_gallery'")) {
+      return 'Course gallery is not set up yet. Run supabase/course-gallery-migration.sql in the Supabase SQL Editor, then reload this page.';
+    }
+    return message;
   }
 }
